@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/react'
 import { Providers } from '@/components/shared/Providers'
 import './globals.css'
 
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <body className="min-h-full antialiased">
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   )

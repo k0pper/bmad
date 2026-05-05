@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+}
+
+enum VitalityState {
+  HOT
+  ACTIVE
+  COOLING
+  COLD
+  DEADLINE
+  GHOSTING
+  IN_DIALOGUE
+  CLOSED
+}
+
+enum OverrideSource {
+  USER
+}
+
+enum ImportSource {
+  URL_IMPORT
+  MANUAL
+}
+
+enum ApplicationStatus {
+  APPLIED
+  INTERVIEWING
+  OFFER_RECEIVED
+  REJECTED
+  WITHDRAWN
+  ON_HOLD
+  GHOSTED
+}
+
+enum ScrapeStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum AuditSource {
+  SYSTEM_RECOMPUTE
+  USER_OVERRIDE
+  USER_OVERRIDE_CLEARED
+  GMAIL_SIGNAL
+  ADMIN_ACTION
+  GDPR_CLEANUP
+  USER_EXPORT_REQUEST
+}
+
+enum ExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id               String           @id @default(cuid())
+  email            String           @unique
+  name             String?
+  role             UserRole         @default(USER)
+  subscriptionTier SubscriptionTier @default(FREE)
+  isActive         Boolean          @default(true)
+  lastVisitAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  preferenceProfile PreferenceProfile?
+  jobListings       JobListing[]
+  applications      Application[]
+  cvVersions        CvVersion[]
+  gmailToken        GmailToken?
+  dataExports       DataExportRequest[]
+  auditLogs         AuditLog[]        @relation("UserAuditLogs")
+
+  @@map("users")
+}
+
+model PreferenceProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  jobFunction        String?
+  seniorityLevel     String?
+  preferredLocations String[] @default([])
+  workStyle          String?
+  targetSalaryMin    Int?
+  targetSalaryMax    Int?
+  salaryCurrency     String?  @default("USD")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("preference_profiles")
+}
+
+model JobListing {
+  id             String          @id @default(cuid())
+  userId         String
+  title          String
+  company        String
+  companyDomain  String?
+  location       String?
+  salaryMin      Int?
+  salaryMax      Int?
+  salaryCurrency String?         @default("USD")
+  sourceUrl      String?
+  notes          String?
+  importSource   ImportSource    @default(MANUAL)
+  vitalityState  VitalityState   @default(COOLING)
+  overrideState  VitalityState?
+  overrideSource OverrideSource?
+  archived       Boolean         @default(false)
+  stateChangedAt DateTime?
+  lastComputedAt DateTime?
+  postedAt       DateTime?
+  closingDate    DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application Application?
+  auditLogs   AuditLog[]
+
+  @@map("job_listings")
+}
+
+model Application {
+  id           String            @id @default(cuid())
+  userId       String
+  jobListingId String            @unique
+  cvSnapshotId String?           @unique
+  status       ApplicationStatus @default(APPLIED)
+  appliedAt    DateTime          @default(now())
+  notes        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobListing JobListing  @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  cvSnapshot CvSnapshot? @relation(fields: [cvSnapshotId], references: [id])
+
+  @@map("applications")
+}
+
+model CvVersion {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  s3Key      String
+  fileSize   Int
+  uploadedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots CvSnapshot[]
+
+  @@map("cv_versions")
+}
+
+model CvSnapshot {
+  id          String   @id @default(cuid())
+  cvVersionId String
+  s3Key       String   @unique
+  snapshotAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  cvVersion   CvVersion    @relation(fields: [cvVersionId], references: [id])
+  application Application?
+
+  @@map("cv_snapshots")
+}
+
+model GmailToken {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  accessToken    String
+  refreshToken   String
+  expiresAt      DateTime
+  connectedEmail String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("gmail_tokens")
+}
+
+model AppConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("app_configs")
+}
+
+model ScrapeLog {
+  id              String       @id @default(cuid())
+  userId          String?
+  url             String
+  status          ScrapeStatus
+  fieldsExtracted String[]     @default([])
+  duration        Int?
+  errorMessage    String?
+  createdAt       DateTime     @default(now())
+
+  @@map("scrape_logs")
+}
+
+model AuditLog {
+  id            String         @id @default(cuid())
+  source        AuditSource
+  userId        String?
+  adminUserId   String?
+  listingId     String?
+  previousState VitalityState?
+  newState      VitalityState?
+  computedAt    DateTime?
+  metadata      Json?
+  createdAt     DateTime       @default(now())
+
+  user       User?       @relation("UserAuditLogs", fields: [userId], references: [id])
+  jobListing JobListing? @relation(fields: [listingId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model DataExportRequest {
+  id          String       @id @default(cuid())
+  userId      String
+  status      ExportStatus @default(PENDING)
+  requestedAt DateTime     @default(now())
+  completedAt DateTime?
+  exportUrl   String?
+  expiresAt   DateTime?
+  createdAt   DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("data_export_requests")
+}
