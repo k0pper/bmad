@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import { UserMenu } from '@/components/shared/UserMenu'
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -30,9 +31,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </Link>
         </nav>
 
-        {/* User menu slot — wired up in Story 1.3 */}
+        {/* User menu */}
         <div className="p-4 border-t border-border">
-          <div data-testid="user-menu-slot" className="h-10" />
+          <UserMenu />
         </div>
       </aside>
 
