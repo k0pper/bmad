@@ -66,7 +66,9 @@ export function authorizedCallback({ auth: session, request }: AuthorizedCallbac
   }
 
   const isDashboard =
-    pathname.startsWith("/board") || pathname.startsWith("/settings")
+    pathname.startsWith("/board") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/onboarding")
   if (isDashboard) return !!session
 
   return true

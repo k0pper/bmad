@@ -151,7 +151,7 @@ describe("authorizedCallback", () => {
     })
   })
 
-  describe("dashboard routes (/board, /settings)", () => {
+  describe("dashboard routes (/board, /settings, /onboarding)", () => {
     it("redirects to login when unauthenticated", () => {
       const result = authorizedCallback({
         auth: null,
@@ -174,6 +174,22 @@ describe("authorizedCallback", () => {
         request: makeRequest("/settings/account"),
       })
       expect(result).toBe(false)
+    })
+
+    it("redirects to login when unauthenticated on /onboarding", () => {
+      const result = authorizedCallback({
+        auth: null,
+        request: makeRequest("/onboarding"),
+      })
+      expect(result).toBe(false)
+    })
+
+    it("allows authenticated access to /onboarding", () => {
+      const result = authorizedCallback({
+        auth: makeSession(),
+        request: makeRequest("/onboarding"),
+      })
+      expect(result).toBe(true)
     })
   })
 
