@@ -7,7 +7,7 @@ vi.mock("@/lib/db", () => ({
       delete: vi.fn(),
     },
     gmailToken: {
-      delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }))
@@ -16,12 +16,12 @@ import { prisma } from "@/lib/db"
 
 type MockPrisma = {
   user: { delete: ReturnType<typeof vi.fn> }
-  gmailToken: { delete: ReturnType<typeof vi.fn> }
+  gmailToken: { deleteMany: ReturnType<typeof vi.fn> }
 }
 
 const mock = prisma as unknown as MockPrisma
 const mockUserDelete = vi.mocked(mock.user.delete)
-const mockGmailDelete = vi.mocked(mock.gmailToken.delete)
+const mockGmailDelete = vi.mocked(mock.gmailToken.deleteMany)
 
 beforeEach(() => {
   mockUserDelete.mockReset()
@@ -42,12 +42,16 @@ describe("deleteAccount", () => {
 
 describe("revokeGmailAccess", () => {
   it("deletes the gmail token by userId", async () => {
-    const deleted = { id: "token-1", userId: "user-1" }
-    mockGmailDelete.mockResolvedValue(deleted)
+    mockGmailDelete.mockResolvedValue({ count: 1 })
 
-    const result = await revokeGmailAccess("user-1")
+    await revokeGmailAccess("user-1")
 
     expect(mockGmailDelete).toHaveBeenCalledWith({ where: { userId: "user-1" } })
-    expect(result).toEqual(deleted)
+  })
+
+  it("is a no-op when no token exists (count 0)", async () => {
+    mockGmailDelete.mockResolvedValue({ count: 0 })
+
+    await expect(revokeGmailAccess("user-1")).resolves.not.toThrow()
   })
 })

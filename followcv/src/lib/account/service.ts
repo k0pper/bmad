@@ -5,5 +5,5 @@ export function deleteAccount(userId: string) {
 }
 
 export function revokeGmailAccess(userId: string) {
-  return prisma.gmailToken.delete({ where: { userId } })
+  return prisma.gmailToken.deleteMany({ where: { userId } })
 }
