@@ -8,12 +8,12 @@ type BoardRowProps = {
   location: string | null
   vitalityState: VitalityState
   importSource: "URL_IMPORT" | "MANUAL"
-  postedAt: Date | null
-  createdAt: Date
+  postedAt: Date | string | null
+  createdAt: Date | string
 }
 
 export function BoardRow({ title, company, location, vitalityState, importSource, createdAt }: BoardRowProps) {
-  const dateLabel = createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  const dateLabel = new Date(createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 
   return (
     <div className="h-14 border-b flex items-center px-4 gap-3">

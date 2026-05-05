@@ -8,8 +8,6 @@ import { importFromUrl, importFromUrlForced } from "@/actions/import-listing"
 type DrawerState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "populated"; title: string; company: string; location?: string; listingId: string }
-  | { status: "partial"; title?: string; company?: string; location?: string; listingId: string }
   | { status: "failed"; url: string }
   | { status: "duplicate"; existingId: string; title: string; company: string }
 
@@ -74,15 +72,9 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
       }
 
       if (data.status === "created") {
-        const { listing } = data
-        setState({
-          status: "populated",
-          listingId: listing.id,
-          title: listing.title,
-          company: listing.company,
-        })
         onOpenChange(false)
         reset()
+        router.refresh()
         return
       }
     })
@@ -100,6 +92,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
       if (result.data.status === "created") {
         onOpenChange(false)
         reset()
+        router.refresh()
       }
     })
   }
