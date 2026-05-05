@@ -148,7 +148,7 @@ describe("importFromUrl", () => {
     expect(result.error).toBeNull()
   })
 
-  it("calls revalidateTag after successful import", async () => {
+  it("does not call revalidateTag (board uses direct Prisma query + router.refresh)", async () => {
     mockAuth.mockResolvedValue(validSession)
     mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
     mockPrisma.jobListing.findFirst.mockResolvedValue(null)
@@ -167,7 +167,7 @@ describe("importFromUrl", () => {
 
     await importFromUrl(makeFormData(testUrl))
 
-    expect(mockRevalidate).toHaveBeenCalledWith("board-user-1", {})
+    expect(mockRevalidate).not.toHaveBeenCalled()
   })
 
   it("uses URL as title fallback when scrape returns no title", async () => {

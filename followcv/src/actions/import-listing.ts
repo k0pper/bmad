@@ -6,7 +6,6 @@ import { checkListingCap } from "@/lib/services/entitlement-service"
 import { scrapeJobListing } from "@/lib/services/scraper-service"
 import { computeVitalityState } from "@/lib/services/vitality-state-machine"
 import { urlImportSchema } from "@/lib/schemas/listing"
-import { revalidateTag } from "next/cache"
 import type { VitalityState } from "@/generated/prisma/client"
 
 type ImportData =
@@ -89,7 +88,6 @@ export async function importFromUrl(formData: FormData): Promise<ActionResult<Im
     // non-critical — log creation failure should not block import
   }
 
-  revalidateTag(`board-${userId}`, {})
 
   return {
     data: {
@@ -159,7 +157,6 @@ export async function importFromUrlForced(url: string): Promise<ActionResult<Imp
     // non-critical
   }
 
-  revalidateTag(`board-${userId}`, {})
 
   return {
     data: {

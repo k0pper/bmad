@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation"
-import { unstable_cache } from "next/cache"
 import { auth } from "@/lib/auth"
 import { getPreferenceProfile } from "@/lib/preferences/service"
 import { prisma } from "@/lib/db"
@@ -8,15 +7,10 @@ import { BoardClient } from "@/components/board/BoardClient"
 import type { VitalityState, ImportSource } from "@/generated/prisma/client"
 
 function getBoardListings(userId: string) {
-  return unstable_cache(
-    () =>
-      prisma.jobListing.findMany({
-        where: { userId, archived: false, deletedAt: null },
-        orderBy: { createdAt: "desc" },
-      }),
-    [`board-${userId}`],
-    { tags: [`board-${userId}`] }
-  )()
+  return prisma.jobListing.findMany({
+    where: { userId, archived: false, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+  })
 }
 
 export default async function BoardPage() {
