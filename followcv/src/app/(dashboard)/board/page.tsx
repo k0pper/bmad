@@ -43,7 +43,7 @@ export default async function BoardPage() {
     <div className="p-8">
       {hasStaleListings && <StalenessBanner />}
       <BoardClient listings={listings}>
-        {listings.map((listing) => {
+        {listings.map((listing, index) => {
           const isRecent =
             listing.stateChangedAt !== null &&
             previousVisitAt !== null &&
@@ -65,6 +65,7 @@ export default async function BoardPage() {
               salaryMax={listing.salaryMax}
               salaryCurrency={listing.salaryCurrency}
               isRecent={isRecent}
+              rowIndex={index}
             />
           )
         })}

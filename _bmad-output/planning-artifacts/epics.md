@@ -133,6 +133,12 @@ UX-DR12: Implement ProGatePattern component — consistent upgrade prompt used a
 UX-DR13: Implement dashboard shell layout — 256px fixed sidebar (left) with "FollowCV" brand name at the top (links back to homepage `/`), navigation links, HealthScoreWidget, and user menu; main content area fills remaining width; layout is the `(dashboard)/layout.tsx` Server Component
 UX-DR14: Implement full keyboard navigation for primary flows: URL import (open drawer → paste → confirm), apply action (open dialog → select CV → confirm), board filter, vitality state override — all without requiring a mouse
 UX-DR15: Implement desktop-first responsive layout — 1280px is the baseline (no `max-width` clamping); at 768px (md breakpoint) sidebar collapses to icon-only or off-canvas; mobile layout is out of scope
+UX-DR16: All UI interactions must be animated purposefully and efficiently. Motion system rules:
+  - **Drawer (ImportDrawer):** slides in from the right on open (`translateX(100%) → 0`, 300 ms `cubic-bezier(0.32,0.72,0,1)`); reverses on close. Backdrop fades in/out (280 ms same easing). Implemented via Base UI `data-starting-style` / `data-ending-style` attributes + `.drawer-popup` / `.drawer-backdrop` CSS classes in `globals.css`.
+  - **Board rows:** staggered slide-up on page load (`translateY(5px) + opacity:0 → normal`, 240 ms ease-out, 35 ms delay per row, capped at 8 rows). Implemented via `.board-row-animate` CSS class + `--row-index` CSS custom property passed as inline style from the server component.
+  - **Sidebar (mobile):** slides in/out via `transition-transform 250 ms cubic-bezier(0.32,0.72,0,1)` on the `<aside>`; overlay fades in via `.sidebar-overlay-enter` CSS animation (200 ms).
+  - **General principle:** enter transitions slightly faster than exit; `will-change: transform` on elements that animate; no animation on reduced-motion (add `@media (prefers-reduced-motion: reduce)` guards if needed in future).
+  - All animation CSS lives in `src/app/globals.css` in the "App-wide motion system" block (above `@layer base`).
 
 ### FR Coverage Map
 

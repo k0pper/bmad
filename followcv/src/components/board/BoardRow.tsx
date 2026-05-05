@@ -15,6 +15,7 @@ type BoardRowProps = {
   salaryMax: number | null
   salaryCurrency: string | null
   isRecent?: boolean
+  rowIndex?: number
 }
 
 function formatSalary(min: number | null, max: number | null, currency: string | null): string | null {
@@ -49,6 +50,7 @@ export function BoardRow({
   salaryMax,
   salaryCurrency,
   isRecent = false,
+  rowIndex = 0,
 }: BoardRowProps) {
   const dateLabel = new Date(createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   const salary = formatSalary(salaryMin, salaryMax, salaryCurrency)
@@ -59,7 +61,8 @@ export function BoardRow({
   return (
     <Link
       href={`/board/${id}`}
-      className="h-14 border-b flex items-center px-4 gap-3 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className="board-row-animate h-14 border-b flex items-center px-4 gap-3 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      style={{ "--row-index": rowIndex } as React.CSSProperties}
     >
       {/* Favicon placeholder */}
       <div

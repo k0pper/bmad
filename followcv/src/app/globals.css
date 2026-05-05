@@ -178,6 +178,75 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ------------------------------------------------------------------ */
+/* App-wide motion system                                              */
+/* All durations intentional: enter faster than exit for snappiness   */
+/* ------------------------------------------------------------------ */
+
+/* --- Drawer -------------------------------------------------------- */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: black;
+  opacity: 0.3;
+  z-index: 40;
+  transition: opacity 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.drawer-backdrop[data-starting-style],
+.drawer-backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+.drawer-viewport {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.drawer-popup {
+  pointer-events: auto;
+  transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+  transform: translateX(var(--drawer-swipe-movement-x, 0px));
+}
+
+.drawer-popup[data-starting-style],
+.drawer-popup[data-ending-style] {
+  transform: translateX(100%);
+}
+
+/* --- Board rows ---------------------------------------------------- */
+@keyframes slideInRow {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.board-row-animate {
+  animation: slideInRow 240ms ease-out both;
+  /* cap stagger at 8 rows so late rows don't feel sluggish */
+  animation-delay: calc(min(var(--row-index, 0), 8) * 35ms);
+}
+
+/* --- Sidebar (mobile) --------------------------------------------- */
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.sidebar-overlay-enter {
+  animation: fadeInOverlay 200ms ease-out both;
+}
+
 @layer base {
   @font-face {
     font-family: 'Inter';

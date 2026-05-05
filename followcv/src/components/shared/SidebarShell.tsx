@@ -13,7 +13,7 @@ export function SidebarShell({
 
   return (
     <>
-      {/* Mobile hamburger button — only visible below md */}
+      {/* Mobile hamburger — only visible below md */}
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -25,31 +25,32 @@ export function SidebarShell({
         <span className="block w-5 h-0.5 bg-current" />
       </button>
 
-      {/* Mobile overlay */}
+      {/* Overlay — mounts/unmounts so the CSS animation reruns on each open */}
       {open && (
         <div
-          className="md:hidden fixed inset-0 z-30 bg-black/40"
+          className="sidebar-overlay-enter md:hidden fixed inset-0 z-30 bg-black/40"
           onClick={() => setOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — always in DOM; slides via transform */}
       <aside
-        className={`
-          flex flex-col flex-shrink-0 border-r bg-surface border-border
-          fixed md:static inset-y-0 left-0 z-40
-          transition-transform duration-200
-          ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-        `}
+        className={[
+          "flex flex-col flex-shrink-0 border-r bg-surface border-border",
+          "fixed md:static inset-y-0 left-0 z-40",
+          "transition-transform duration-250 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        ].join(" ")}
         style={{ width }}
         aria-label="Sidebar"
       >
-        {/* Close button on mobile */}
+        {/* Close button — mobile only */}
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="md:hidden absolute top-3 right-3 p-1 rounded text-sm"
+          className="md:hidden absolute top-3 right-3 p-1.5 rounded text-sm leading-none"
+          style={{ color: "var(--color-text-secondary)" }}
           aria-label="Close navigation"
         >
           ✕

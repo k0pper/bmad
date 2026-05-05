@@ -166,8 +166,9 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
   return (
     <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
-        <Drawer.Backdrop className="fixed inset-0 bg-black/20 z-40" />
-        <Drawer.Popup className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-background shadow-xl md:w-96 xl:w-[480px]">
+        <Drawer.Backdrop className="drawer-backdrop" />
+        <Drawer.Viewport className="drawer-viewport">
+        <Drawer.Popup className="drawer-popup flex h-full w-full flex-col bg-background shadow-xl md:w-96 xl:w-[480px]">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
               {isManualForm ? "Enter listing manually" : "Import job listing"}
@@ -397,6 +398,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
             )}
           </div>
         </Drawer.Popup>
+        </Drawer.Viewport>
       </Drawer.Portal>
     </Drawer.Root>
   )
