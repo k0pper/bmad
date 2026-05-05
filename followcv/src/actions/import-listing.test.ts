@@ -22,7 +22,7 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }))
 
-import { importFromUrl } from "./import-listing"
+import { importFromUrl, manualImportListing } from "./import-listing"
 import { auth } from "@/lib/auth"
 import { checkListingCap } from "@/lib/services/entitlement-service"
 import { scrapeJobListing } from "@/lib/services/scraper-service"
@@ -190,5 +190,116 @@ describe("importFromUrl", () => {
         data: expect.objectContaining({ title: testUrl, company: "Unknown" }),
       })
     )
+  })
+})
+
+describe("manualImportListing", () => {
+  function makeManualFormData(overrides: Record<string, string> = {}): FormData {
+    const fd = new FormData()
+    fd.append("title", overrides.title ?? "Senior Engineer")
+    fd.append("company", overrides.company ?? "Acme Corp")
+    if (overrides.location) fd.append("location", overrides.location)
+    if (overrides.sourceUrl) fd.append("sourceUrl", overrides.sourceUrl)
+    if (overrides.notes) fd.append("notes", overrides.notes)
+    return fd
+  }
+
+  it("returns error when not authenticated", async () => {
+    mockAuth.mockResolvedValue(null)
+    const result = await manualImportListing(makeManualFormData())
+    expect(result).toEqual({ data: null, error: "Unauthorized" })
+  })
+
+  it("returns cap_reached when at listing limit", async () => {
+    mockAuth.mockResolvedValue(validSession)
+    mockCheckCap.mockResolvedValue({ allowed: false, count: 25, cap: 25 })
+    const result = await manualImportListing(makeManualFormData())
+    expect(result.data).toEqual({ status: "cap_reached", count: 25, cap: 25 })
+    expect(result.error).toBeNull()
+  })
+
+  it("returns error when title is missing", async () => {
+    mockAuth.mockResolvedValue(validSession)
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    const fd = new FormData()
+    fd.append("company", "Acme Corp")
+    const result = await manualImportListing(fd)
+    expect(result.data).toBeNull()
+    expect(result.error).toBeTruthy()
+  })
+
+  it("returns error when company is missing", async () => {
+    mockAuth.mockResolvedValue(validSession)
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    const fd = new FormData()
+    fd.append("title", "Engineer")
+    const result = await manualImportListing(fd)
+    expect(result.data).toBeNull()
+    expect(result.error).toBeTruthy()
+  })
+
+  it("creates listing with MANUAL importSource on success", async () => {
+    mockAuth.mockResolvedValue(validSession)
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCompute.mockReturnValue("COOLING")
+    mockPrisma.jobListing.create.mockResolvedValue({
+      id: "manual-1",
+      title: "Senior Engineer",
+      company: "Acme Corp",
+      vitalityState: "COOLING",
+    })
+    const result = await manualImportListing(makeManualFormData())
+    expect(result.data).toEqual({
+      status: "created",
+      listing: { id: "manual-1", title: "Senior Engineer", company: "Acme Corp", vitalityState: "COOLING" },
+    })
+    expect(result.error).toBeNull()
+    expect(mockPrisma.jobListing.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ importSource: "MANUAL" }),
+      })
+    )
+  })
+
+  it("passes optional fields through to the listing", async () => {
+    mockAuth.mockResolvedValue(validSession)
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCompute.mockReturnValue("COOLING")
+    mockPrisma.jobListing.create.mockResolvedValue({
+      id: "manual-2",
+      title: "Engineer",
+      company: "Corp",
+      vitalityState: "COOLING",
+    })
+    const fd = new FormData()
+    fd.append("title", "Engineer")
+    fd.append("company", "Corp")
+    fd.append("location", "London")
+    fd.append("sourceUrl", "https://jobs.example.com/1")
+    fd.append("notes", "Interesting role")
+    await manualImportListing(fd)
+    expect(mockPrisma.jobListing.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          location: "London",
+          sourceUrl: "https://jobs.example.com/1",
+          notes: "Interesting role",
+        }),
+      })
+    )
+  })
+
+  it("does not call revalidateTag", async () => {
+    mockAuth.mockResolvedValue(validSession)
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCompute.mockReturnValue("COOLING")
+    mockPrisma.jobListing.create.mockResolvedValue({
+      id: "manual-3",
+      title: "Engineer",
+      company: "Corp",
+      vitalityState: "COOLING",
+    })
+    await manualImportListing(makeManualFormData())
+    expect(mockRevalidate).not.toHaveBeenCalled()
   })
 })

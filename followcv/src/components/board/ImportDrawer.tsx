@@ -3,17 +3,29 @@
 import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Drawer } from "@base-ui/react"
-import { importFromUrl, importFromUrlForced } from "@/actions/import-listing"
+import { importFromUrl, importFromUrlForced, manualImportListing } from "@/actions/import-listing"
 
 type DrawerState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "failed"; url: string }
+  | { status: "failed"; url: string; prefilledCompany?: string }
+  | { status: "manual" }
   | { status: "duplicate"; existingId: string; title: string; company: string }
 
 type ImportDrawerProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+function companyFromUrl(url: string): string {
+  try {
+    const { hostname } = new URL(url)
+    const stripped = hostname.replace(/^www\./, "")
+    const name = stripped.split(".")[0]
+    return name.charAt(0).toUpperCase() + name.slice(1)
+  } catch {
+    return ""
+  }
 }
 
 export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
@@ -24,10 +36,28 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
+  // Manual form fields
+  const [manualTitle, setManualTitle] = useState("")
+  const [manualCompany, setManualCompany] = useState("")
+  const [manualLocation, setManualLocation] = useState("")
+  const [manualSourceUrl, setManualSourceUrl] = useState("")
+  const [manualNotes, setManualNotes] = useState("")
+  const [manualSalaryMin, setManualSalaryMin] = useState("")
+  const [manualSalaryMax, setManualSalaryMax] = useState("")
+  const [manualError, setManualError] = useState<string | null>(null)
+
   function reset() {
     setState({ status: "idle" })
     setUrl("")
     setErrorMessage(null)
+    setManualTitle("")
+    setManualCompany("")
+    setManualLocation("")
+    setManualSourceUrl("")
+    setManualNotes("")
+    setManualSalaryMin("")
+    setManualSalaryMax("")
+    setManualError(null)
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -48,8 +78,11 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
       const result = await importFromUrl(fd)
 
       if (!result.data) {
-        setErrorMessage(result.error)
-        setState({ status: "failed", url: pastedUrl })
+        // Scrape failed — drop into manual form pre-filled with what we can extract
+        setManualCompany(companyFromUrl(pastedUrl))
+        setManualSourceUrl(pastedUrl)
+        setManualError(null)
+        setState({ status: "failed", url: pastedUrl, prefilledCompany: companyFromUrl(pastedUrl) })
         return
       }
 
@@ -85,8 +118,10 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
     startTransition(async () => {
       const result = await importFromUrlForced(url)
       if (!result.data) {
-        setErrorMessage(result.error)
-        setState({ status: "failed", url })
+        setManualCompany(companyFromUrl(url))
+        setManualSourceUrl(url)
+        setManualError(null)
+        setState({ status: "failed", url, prefilledCompany: companyFromUrl(url) })
         return
       }
       if (result.data.status === "created") {
@@ -97,6 +132,37 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
     })
   }
 
+  function handleManualSubmit() {
+    setManualError(null)
+    const fd = new FormData()
+    fd.append("title", manualTitle)
+    fd.append("company", manualCompany)
+    if (manualLocation) fd.append("location", manualLocation)
+    if (manualSalaryMin) fd.append("salaryMin", manualSalaryMin)
+    if (manualSalaryMax) fd.append("salaryMax", manualSalaryMax)
+    if (manualSourceUrl) fd.append("sourceUrl", manualSourceUrl)
+    if (manualNotes) fd.append("notes", manualNotes)
+
+    startTransition(async () => {
+      const result = await manualImportListing(fd)
+      if (!result.data) {
+        setManualError(result.error)
+        return
+      }
+      if (result.data.status === "cap_reached") {
+        setManualError(`You've reached the ${result.data.cap} listing limit for the free tier.`)
+        return
+      }
+      if (result.data.status === "created") {
+        onOpenChange(false)
+        reset()
+        router.refresh()
+      }
+    })
+  }
+
+  const isManualForm = state.status === "failed" || state.status === "manual"
+
   return (
     <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
@@ -104,7 +170,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
         <Drawer.Popup className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-background shadow-xl md:w-96 xl:w-[480px]">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-              Import job listing
+              {isManualForm ? "Enter listing manually" : "Import job listing"}
             </h2>
             <Drawer.Close
               className="rounded-full p-1 text-sm outline-none hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring"
@@ -123,59 +189,180 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
             )}
 
             {(state.status === "idle" || state.status === "loading") && (
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="import-url"
-                  className="block text-sm font-medium"
-                  style={{ color: "var(--color-text-primary)" }}
-                >
-                  Job URL
-                </label>
-                <input
-                  ref={urlInputRef}
-                  id="import-url"
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  onPaste={handlePaste}
-                  disabled={state.status === "loading" || isPending}
-                  autoFocus
-                  placeholder="Paste a job URL"
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
-                />
-                {(state.status === "loading" || isPending) && (
-                  <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                    Fetching listing details…
-                  </p>
-                )}
-              </div>
-            )}
-
-            {state.status === "failed" && (
               <div className="space-y-3">
-                <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                  We couldn&apos;t read this page — fill in what you know
-                </p>
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
-                    URL
+                  <label
+                    htmlFor="import-url"
+                    className="block text-sm font-medium"
+                    style={{ color: "var(--color-text-primary)" }}
+                  >
+                    Job URL
                   </label>
                   <input
+                    ref={urlInputRef}
+                    id="import-url"
                     type="url"
-                    value={state.url}
-                    readOnly
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm opacity-60"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    onPaste={handlePaste}
+                    disabled={state.status === "loading" || isPending}
+                    autoFocus
+                    placeholder="Paste a job URL"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
                   />
+                  {(state.status === "loading" || isPending) && (
+                    <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                      Fetching listing details…
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
                   className="text-xs underline"
-                  style={{ color: "var(--color-brand)" }}
-                  onClick={() => setState({ status: "idle" })}
+                  style={{ color: "var(--color-text-secondary)" }}
+                  onClick={() => {
+                    setManualError(null)
+                    setState({ status: "manual" })
+                  }}
                 >
-                  Try a different URL
+                  Enter manually
                 </button>
               </div>
+            )}
+
+            {isManualForm && (
+              <form onSubmit={(e) => { e.preventDefault(); handleManualSubmit() }} className="space-y-3">
+                {state.status === "failed" && (
+                  <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                    We couldn&apos;t read this page — fill in what you know
+                  </p>
+                )}
+
+                {manualError && (
+                  <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
+                    {manualError}
+                  </p>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
+                    Job title <span aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    placeholder="e.g. Senior Product Designer"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
+                    Company <span aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={manualCompany}
+                    onChange={(e) => setManualCompany(e.target.value)}
+                    placeholder="e.g. Acme Corp"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={manualLocation}
+                    onChange={(e) => setManualLocation(e.target.value)}
+                    placeholder="e.g. London, Remote"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="flex-1 space-y-1.5">
+                    <label className="block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                      Salary min
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={manualSalaryMin}
+                      onChange={(e) => setManualSalaryMin(e.target.value)}
+                      placeholder="e.g. 80000"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <label className="block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                      Salary max
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={manualSalaryMax}
+                      onChange={(e) => setManualSalaryMax(e.target.value)}
+                      placeholder="e.g. 120000"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                    Source URL
+                  </label>
+                  <input
+                    type="url"
+                    value={manualSourceUrl}
+                    onChange={(e) => setManualSourceUrl(e.target.value)}
+                    placeholder="https://…"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                    Notes
+                  </label>
+                  <textarea
+                    value={manualNotes}
+                    onChange={(e) => setManualNotes(e.target.value)}
+                    rows={3}
+                    placeholder="Anything worth remembering…"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 resize-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="w-full rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    style={{ backgroundColor: "var(--color-brand)" }}
+                  >
+                    {isPending ? "Adding…" : "Add to board"}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs underline"
+                    style={{ color: "var(--color-brand)" }}
+                    onClick={() => {
+                      setManualError(null)
+                      setState({ status: "idle" })
+                    }}
+                  >
+                    {state.status === "failed" ? "Try a different URL" : "Back to URL import"}
+                  </button>
+                </div>
+              </form>
             )}
 
             {state.status === "duplicate" && (
@@ -199,7 +386,8 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
                   <button
                     type="button"
                     disabled={isPending}
-                    className="w-full rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    className="w-full rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    style={{ backgroundColor: "var(--color-brand)" }}
                     onClick={handleImportForced}
                   >
                     Import as new

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db"
 import { checkListingCap } from "@/lib/services/entitlement-service"
 import { scrapeJobListing } from "@/lib/services/scraper-service"
 import { computeVitalityState } from "@/lib/services/vitality-state-machine"
-import { urlImportSchema } from "@/lib/schemas/listing"
+import { urlImportSchema, manualImportSchema } from "@/lib/schemas/listing"
 import type { VitalityState } from "@/generated/prisma/client"
 
 type ImportData =
@@ -157,6 +157,81 @@ export async function importFromUrlForced(url: string): Promise<ActionResult<Imp
     // non-critical
   }
 
+
+  return {
+    data: {
+      status: "created",
+      listing: { id: listing.id, title: listing.title, company: listing.company, vitalityState: listing.vitalityState },
+    },
+    error: null,
+  }
+}
+
+export async function manualImportListing(formData: FormData): Promise<ActionResult<ImportData>> {
+  const session = await auth()
+  if (!session?.user?.id) return { data: null, error: "Unauthorized" }
+
+  const userId = session.user.id
+
+  const cap = await checkListingCap(userId)
+  if (!cap.allowed) {
+    return { data: { status: "cap_reached", count: cap.count, cap: cap.cap }, error: null }
+  }
+
+  const parsed = manualImportSchema.safeParse({
+    title: formData.get("title"),
+    company: formData.get("company"),
+    location: formData.get("location") || undefined,
+    salaryMin: formData.get("salaryMin") || undefined,
+    salaryMax: formData.get("salaryMax") || undefined,
+    sourceUrl: formData.get("sourceUrl") || undefined,
+    notes: formData.get("notes") || undefined,
+  })
+  if (!parsed.success) {
+    return { data: null, error: parsed.error.issues?.[0]?.message ?? "Invalid input" }
+  }
+
+  const now = new Date()
+  const vitalityState = computeVitalityState({
+    postedAt: null,
+    closingDate: null,
+    application: null,
+    gmailSignalAt: null,
+    overrideState: null,
+    overrideSource: null,
+    isArchived: false,
+    now,
+  }) ?? "COOLING"
+
+  const listing = await prisma.jobListing.create({
+    data: {
+      userId,
+      title: parsed.data.title,
+      company: parsed.data.company,
+      location: parsed.data.location ?? null,
+      salaryMin: parsed.data.salaryMin ? Number(parsed.data.salaryMin) : null,
+      salaryMax: parsed.data.salaryMax ? Number(parsed.data.salaryMax) : null,
+      sourceUrl: parsed.data.sourceUrl || null,
+      notes: parsed.data.notes ?? null,
+      importSource: "MANUAL",
+      vitalityState,
+      lastComputedAt: now,
+    },
+  })
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        source: "SYSTEM_RECOMPUTE",
+        userId,
+        listingId: listing.id,
+        newState: vitalityState,
+        computedAt: now,
+      },
+    })
+  } catch {
+    // non-critical
+  }
 
   return {
     data: {
