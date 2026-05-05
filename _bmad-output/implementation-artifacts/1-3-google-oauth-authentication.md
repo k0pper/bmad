@@ -1,6 +1,6 @@
 # Story 1.3: Google OAuth Authentication
 
-Status: review
+Status: done
 
 ## Story
 

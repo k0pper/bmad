@@ -1,6 +1,6 @@
 # Story 1.4: Onboarding Preference Setup
 
-Status: review
+Status: done
 
 ## Story
 

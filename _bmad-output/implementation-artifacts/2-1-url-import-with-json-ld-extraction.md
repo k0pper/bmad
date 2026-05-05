@@ -1,6 +1,6 @@
 # Story 2.1: URL Import with JSON-LD Extraction
 
-Status: review
+Status: done
 
 ## Story
 

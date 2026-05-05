@@ -1,6 +1,6 @@
 # Story 1.2: Database Schema & Infrastructure Setup
 
-Status: review
+Status: done
 
 ## Story
 

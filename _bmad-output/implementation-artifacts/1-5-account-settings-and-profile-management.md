@@ -1,6 +1,6 @@
 # Story 1.5: Account Settings & Profile Management
 
-Status: review
+Status: done
 
 ## Story
 

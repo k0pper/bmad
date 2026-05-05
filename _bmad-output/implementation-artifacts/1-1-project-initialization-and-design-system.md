@@ -1,6 +1,6 @@
 # Story 1.1: Project Initialization & Design System Foundation
 
-Status: review
+Status: done
 
 ## Story
 
