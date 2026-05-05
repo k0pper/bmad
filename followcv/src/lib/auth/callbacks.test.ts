@@ -8,14 +8,14 @@ import type { JWT } from "@auth/core/jwt"
 // ── jwtCallback ───────────────────────────────────────────────────────────────
 
 describe("jwtCallback", () => {
-  const mockUpsertUser = vi.fn()
+  const mockFindOrCreate = vi.fn()
 
   beforeEach(() => {
-    mockUpsertUser.mockReset()
+    mockFindOrCreate.mockReset()
   })
 
   it("upserts user and populates token on first sign-in", async () => {
-    mockUpsertUser.mockResolvedValue({
+    mockFindOrCreate.mockResolvedValue({
       id: "user-1",
       role: "USER",
       subscriptionTier: "FREE",
@@ -26,10 +26,10 @@ describe("jwtCallback", () => {
         token: {} as JWT,
         user: { id: "google-1", email: "test@example.com", name: "Test User" },
       },
-      mockUpsertUser
+      mockFindOrCreate
     )
 
-    expect(mockUpsertUser).toHaveBeenCalledWith("test@example.com", "Test User")
+    expect(mockFindOrCreate).toHaveBeenCalledWith("test@example.com", "Test User")
     expect(token.userId).toBe("user-1")
     expect(token.role).toBe("USER")
     expect(token.subscriptionTier).toBe("FREE")
@@ -49,10 +49,10 @@ describe("jwtCallback", () => {
 
     const token = await jwtCallback(
       { token: existingToken, user: null },
-      mockUpsertUser
+      mockFindOrCreate
     )
 
-    expect(mockUpsertUser).not.toHaveBeenCalled()
+    expect(mockFindOrCreate).not.toHaveBeenCalled()
     expect(token.userId).toBe("user-1")
     expect(token.subscriptionTier).toBe("PRO")
     expect(token.gmailConnected).toBe(true)
@@ -62,7 +62,7 @@ describe("jwtCallback", () => {
 
   it("always updates lastActivity", async () => {
     const before = Date.now()
-    const token = await jwtCallback({ token: {} as JWT, user: null }, mockUpsertUser)
+    const token = await jwtCallback({ token: {} as JWT, user: null }, mockFindOrCreate)
     expect(token.lastActivity).toBeGreaterThanOrEqual(before)
   })
 })

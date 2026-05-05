@@ -21,16 +21,14 @@ type AuthorizedCallbackParams = {
   request: NextRequest
 }
 
+type DbUser = { id: string; role: UserRole; subscriptionTier: SubscriptionTier }
+
 export async function jwtCallback(
   { token, user }: JwtCallbackParams,
-  upsertUser: (email: string, name: string | null) => Promise<{
-    id: string
-    role: UserRole
-    subscriptionTier: SubscriptionTier
-  }>
+  findOrCreateUser: (email: string, name: string | null) => Promise<DbUser>
 ): Promise<JWT> {
   if (user?.email) {
-    const dbUser = await upsertUser(user.email, user.name ?? null)
+    const dbUser = await findOrCreateUser(user.email, user.name ?? null)
     token.userId = dbUser.id
     token.role = dbUser.role
     token.subscriptionTier = dbUser.subscriptionTier

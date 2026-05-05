@@ -18,14 +18,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     jwt: (params) =>
-      jwtCallback(params, (email, name) =>
-        prisma.user.upsert({
+      jwtCallback(params, async (email, name) => {
+        // upsert is not supported by PrismaNeonHttp (no transactions in HTTP mode)
+        const existing = await prisma.user.findUnique({
           where: { email },
-          create: { email, name },
-          update: {},
           select: { id: true, role: true, subscriptionTier: true },
         })
-      ),
+        if (existing) return existing
+        return prisma.user.create({
+          data: { email, name },
+          select: { id: true, role: true, subscriptionTier: true },
+        })
+      }),
     session: sessionCallback,
     authorized: authorizedCallback,
   },
