@@ -14,6 +14,7 @@ type BoardRowProps = {
   salaryMin: number | null
   salaryMax: number | null
   salaryCurrency: string | null
+  isRecent?: boolean
 }
 
 function formatSalary(min: number | null, max: number | null, currency: string | null): string | null {
@@ -47,6 +48,7 @@ export function BoardRow({
   salaryMin,
   salaryMax,
   salaryCurrency,
+  isRecent = false,
 }: BoardRowProps) {
   const dateLabel = new Date(createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   const salary = formatSalary(salaryMin, salaryMax, salaryCurrency)
@@ -67,12 +69,22 @@ export function BoardRow({
 
       {/* Title + subtitle */}
       <div className="flex-1 min-w-0">
-        <p
-          className="text-sm font-medium truncate"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          {title}
-        </p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p
+            className="text-sm font-medium truncate"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            {title}
+          </p>
+          {isRecent && (
+            <span
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: "var(--color-brand)" }}
+              title="Updated since your last visit"
+              aria-label="Updated since your last visit"
+            />
+          )}
+        </div>
         <p
           className="text-xs truncate"
           style={{ color: "var(--color-text-secondary)" }}

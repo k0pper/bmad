@@ -1,14 +1,12 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { UserMenu } from '@/components/shared/UserMenu'
+import { SidebarShell } from '@/components/shared/SidebarShell'
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside
-        className="flex flex-col flex-shrink-0 border-r bg-surface border-border"
-        style={{ width: 'var(--sidebar-width)' }}
-      >
+      <SidebarShell width="var(--sidebar-width)">
         {/* Brand */}
         <div className="px-4 py-3 border-b border-border">
           <Link
@@ -46,9 +44,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="p-4 border-t border-border">
           <UserMenu />
         </div>
-      </aside>
+      </SidebarShell>
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto md:ml-0 pl-10 md:pl-0">
         {children}
       </main>
     </div>
