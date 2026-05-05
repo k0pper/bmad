@@ -36,6 +36,9 @@ export default async function BoardPage() {
             importSource={listing.importSource as ImportSource}
             postedAt={listing.postedAt}
             createdAt={listing.createdAt}
+            salaryMin={listing.salaryMin}
+            salaryMax={listing.salaryMax}
+            salaryCurrency={listing.salaryCurrency}
           />
         ))}
       </BoardClient>

@@ -9,6 +9,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         className="flex flex-col flex-shrink-0 border-r bg-surface border-border"
         style={{ width: 'var(--sidebar-width)' }}
       >
+        {/* Brand */}
+        <div className="px-4 py-3 border-b border-border">
+          <Link
+            href="/"
+            className="text-base font-semibold tracking-tight"
+            style={{ color: 'var(--color-brand)' }}
+          >
+            FollowCV
+          </Link>
+        </div>
+
         {/* Health score slot — wired up in Story 4.1 */}
         <div
           data-testid="health-score-slot"

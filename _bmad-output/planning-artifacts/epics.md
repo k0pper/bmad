@@ -122,7 +122,7 @@ UX-DR1: Implement Tailwind v4 @theme CSS variables in globals.css — brand colo
 UX-DR2: Self-host Inter variable font and configure in root layout with `font-display: swap`; apply as the default sans-serif via Tailwind theme
 UX-DR3: Implement VitalityBadge component — 8 states (Hot/Active/Cooling/Cold/Deadline/Ghosting/In Dialogue/Closed) each with a distinct emoji, label, and background color; color is never the sole signal (requires label per NFR-A3)
 UX-DR4: Implement HealthScoreWidget component — displays coaching zone icon (🟢/🟡/🔴), coaching instruction text with named listings (e.g., "Follow up on Principal Designer (Stripe) today"), and zone color; always visible in dashboard sidebar
-UX-DR5: Implement BoardRow component — 56px row height, Server Component outer shell with Client Component wrapper for interactive controls (status change, archive, apply); supports useOptimistic for instant feedback on mutations
+UX-DR5: Implement BoardRow component — 56px row height, Server Component outer shell with Client Component wrapper for interactive controls (status change, archive, apply); supports useOptimistic for instant feedback on mutations; each row displays salary range (e.g. "$80k–$120k") and posting date (relative, e.g. "Posted 3 days ago") when available; entire row is clickable and navigates to the listing detail page
 UX-DR6: Implement ImportDrawer component — slide-over drawer pattern (no modal) with URL input field as primary path; on scraper failure or incomplete data, surface manual entry form with pre-filled fields inline (no navigation away)
 UX-DR7: Implement ApplyRitualDialog component — dialog that surfaces CV version selector, optional notes, optional supporting document upload, and application date; confirm action triggers apply Server Action and CV snapshot creation
 UX-DR8: Implement CVVersionSelector component — list of CV versions with name, upload date, file size, and active indicator; supports selecting a version for apply action or management actions (rename, duplicate, restore)
@@ -130,7 +130,7 @@ UX-DR9: Implement FilterChipBar component — horizontal chip row for filtering 
 UX-DR10: Implement EmptyBoardState component — first-session zero-state with headline, sub-copy, and primary CTA ("Import your first job") that opens ImportDrawer; must not be a blank page
 UX-DR11: Implement StalenessBanner component — board-level recency signal displaying last_computed_at timestamp when it is more than 2 hours old; dismissible per session
 UX-DR12: Implement ProGatePattern component — consistent upgrade prompt used at all Pro feature surfaces (listing cap, Gmail connect, CV Strength, public profile); single component with configurable headline and CTA copy
-UX-DR13: Implement dashboard shell layout — 256px fixed sidebar (left) with navigation links, HealthScoreWidget, and user menu; main content area fills remaining width; layout is the `(dashboard)/layout.tsx` Server Component
+UX-DR13: Implement dashboard shell layout — 256px fixed sidebar (left) with "FollowCV" brand name at the top (links back to homepage `/`), navigation links, HealthScoreWidget, and user menu; main content area fills remaining width; layout is the `(dashboard)/layout.tsx` Server Component
 UX-DR14: Implement full keyboard navigation for primary flows: URL import (open drawer → paste → confirm), apply action (open dialog → select CV → confirm), board filter, vitality state override — all without requiring a mouse
 UX-DR15: Implement desktop-first responsive layout — 1280px is the baseline (no `max-width` clamping); at 768px (md breakpoint) sidebar collapses to icon-only or off-canvas; mobile layout is out of scope
 
@@ -377,7 +377,7 @@ So that I can scan my entire job search pipeline at a glance.
 
 **Given** a user navigates to `/board`,
 **When** the page loads,
-**Then** all active (non-archived) `JobListing` records for the user render as `BoardRow` components — 56px row height, showing: company, title, `VitalityBadge`, date added, and application status
+**Then** all active (non-archived) `JobListing` records for the user render as `BoardRow` components — 56px row height, showing: company, title, `VitalityBadge`, date added, salary range (when available), and posting date (relative label, when available); each row is a clickable link to `/board/[listingId]`
 **And** the board loads within 2 seconds for up to 100 listings (next/cache with `board-{userId}` tag)
 **And** the `VitalityBadge` displays each of the 8 vitality states with a distinct emoji, label, and background colour; colour is never the sole signal
 **And** a user with zero listings sees the `EmptyBoardState` component with a primary CTA to open ImportDrawer
@@ -445,11 +445,11 @@ So that I can see all fields, notes, application history, and CV snapshot in one
 
 **Given** a user clicks a `BoardRow` on `/board`,
 **When** the listing detail page loads at `/board/[listingId]`,
-**Then** all `JobListing` fields are rendered: title, company, location, salary range, date added, source URL, notes, and current vitality state
+**Then** all `JobListing` fields are rendered: title, company, location, salary range (formatted as "$80k–$120k" when available), posting date, date added, source URL, notes, and current vitality state
+**And** a "How this state was determined" section is shown beneath the vitality badge — it renders each of the 11 state machine rules with a pass/skip/fail indicator and a plain-English explanation of the inputs that were evaluated (e.g. "Posted 3 days ago — within 7-day window → HOT ✓"); the firing rule is visually highlighted
 **And** if an `Application` record exists for the listing, the application detail section is shown: status, applied date, applied CV version name, and "View CV sent" button
 **And** if no application exists, a "Record application" CTA is shown (same flow as Story 3.3)
-**And** the page fetches data via a Server Component with `next/cache` tagged `listing-{listingId}` so board-level revalidations also refresh the detail view
-**And** a breadcrumb or back link returns the user to `/board` preserving filter/sort state via the `?` query string
+**And** a back link returns the user to `/board`
 **And** the page is accessible: all interactive elements reachable by keyboard, heading hierarchy correct, ARIA labels on action buttons
 
 ---
