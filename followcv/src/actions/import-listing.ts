@@ -24,7 +24,7 @@ export async function importFromUrl(formData: FormData): Promise<ActionResult<Im
 
   const parsed = urlImportSchema.safeParse({ url: formData.get("url") })
   if (!parsed.success) {
-    return { data: null, error: parsed.error.errors?.[0]?.message ?? "Invalid URL" }
+    return { data: null, error: parsed.error.issues?.[0]?.message ?? "Invalid URL" }
   }
   const url = parsed.data.url
 
@@ -89,7 +89,7 @@ export async function importFromUrl(formData: FormData): Promise<ActionResult<Im
     // non-critical — log creation failure should not block import
   }
 
-  revalidateTag(`board-${userId}`)
+  revalidateTag(`board-${userId}`, {})
 
   return {
     data: {
@@ -159,7 +159,7 @@ export async function importFromUrlForced(url: string): Promise<ActionResult<Imp
     // non-critical
   }
 
-  revalidateTag(`board-${userId}`)
+  revalidateTag(`board-${userId}`, {})
 
   return {
     data: {

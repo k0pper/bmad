@@ -30,7 +30,8 @@ import { computeVitalityState } from "@/lib/services/vitality-state-machine"
 import { prisma } from "@/lib/db"
 import { revalidateTag } from "next/cache"
 
-const mockAuth = vi.mocked(auth)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAuth = auth as unknown as ReturnType<typeof vi.fn> & { mockResolvedValue: (v: any) => void }
 const mockCheckCap = vi.mocked(checkListingCap)
 const mockScrape = vi.mocked(scrapeJobListing)
 const mockCompute = vi.mocked(computeVitalityState)
@@ -166,7 +167,7 @@ describe("importFromUrl", () => {
 
     await importFromUrl(makeFormData(testUrl))
 
-    expect(mockRevalidate).toHaveBeenCalledWith("board-user-1")
+    expect(mockRevalidate).toHaveBeenCalledWith("board-user-1", {})
   })
 
   it("uses URL as title fallback when scrape returns no title", async () => {

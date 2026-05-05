@@ -49,30 +49,32 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
     startTransition(async () => {
       const result = await importFromUrl(fd)
 
-      if (result.error) {
+      if (!result.data) {
         setErrorMessage(result.error)
         setState({ status: "failed", url: pastedUrl })
         return
       }
 
-      if (result.data.status === "cap_reached") {
-        setErrorMessage(`You've reached the ${result.data.cap} listing limit for the free tier.`)
+      const data = result.data
+
+      if (data.status === "cap_reached") {
+        setErrorMessage(`You've reached the ${data.cap} listing limit for the free tier.`)
         setState({ status: "idle" })
         return
       }
 
-      if (result.data.status === "duplicate") {
+      if (data.status === "duplicate") {
         setState({
           status: "duplicate",
-          existingId: result.data.existingId,
-          title: result.data.title,
-          company: result.data.company,
+          existingId: data.existingId,
+          title: data.title,
+          company: data.company,
         })
         return
       }
 
-      if (result.data.status === "created") {
-        const { listing } = result.data
+      if (data.status === "created") {
+        const { listing } = data
         setState({
           status: "populated",
           listingId: listing.id,
@@ -90,12 +92,12 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
     setState({ status: "loading" })
     startTransition(async () => {
       const result = await importFromUrlForced(url)
-      if (result.error) {
+      if (!result.data) {
         setErrorMessage(result.error)
         setState({ status: "failed", url })
         return
       }
-      if (result.data?.status === "created") {
+      if (result.data.status === "created") {
         onOpenChange(false)
         reset()
       }
@@ -159,7 +161,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
             {state.status === "failed" && (
               <div className="space-y-3">
                 <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                  We couldn't read this page — fill in what you know
+                  We couldn&apos;t read this page — fill in what you know
                 </p>
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>

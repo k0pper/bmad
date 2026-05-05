@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect } from "vitest"
 import { computeVitalityState } from "./vitality-state-machine"
 import type { VitalityInputs } from "./vitality-state-machine"
 
