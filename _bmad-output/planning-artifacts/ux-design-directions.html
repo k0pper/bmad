@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FollowCV — Design Direction Showcase</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --background: #FFFFFF; --surface: #F8FAFC; --border: #E2E8F0;
+      --text-primary: #0F172A; --text-secondary: #475569; --text-tertiary: #94A3B8;
+      --brand: #4F46E5; --brand-hover: #4338CA; --brand-subtle: #EEF2FF;
+      --success: #059669; --warning: #D97706; --danger: #EF4444; --info: #0EA5E9;
+      --hot-bg:#FEF3C7; --hot-t:#92400E;
+      --deadline-bg:#FFEDD5; --deadline-t:#9A3412;
+      --active-bg:#D1FAE5; --active-t:#065F46;
+      --dialogue-bg:#DBEAFE; --dialogue-t:#1E40AF;
+      --cooling-bg:#E0F2FE; --cooling-t:#075985;
+      --cold-bg:#F1F5F9; --cold-t:#475569;
+      --ghosting-bg:#F3E8FF; --ghosting-t:#6D28D9;
+      --closed-bg:#F5F5F5; --closed-t:#737373;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Inter',sans-serif;background:#0F172A;color:var(--text-primary);}
+
+    /* SHOWCASE NAV */
+    .snav{position:fixed;top:0;left:0;right:0;z-index:200;background:#1E293B;
+      padding:10px 20px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #334155;}
+    .snav .logo{color:white;font-weight:700;font-size:13px;margin-right:12px;letter-spacing:-0.01em;}
+    .dbtn{padding:5px 12px;border-radius:6px;border:none;cursor:pointer;
+      font-family:'Inter',sans-serif;font-size:12px;font-weight:500;
+      background:transparent;color:#94A3B8;transition:all .15s;}
+    .dbtn:hover{background:#334155;color:white;}
+    .dbtn.active{background:var(--brand);color:white;}
+    .dir-note{margin-left:auto;font-size:11px;color:#64748B;}
+
+    /* DIRECTION CONTAINERS */
+    .direction{display:none;padding:62px 20px 40px;}
+    .direction.active{display:block;}
+    .dir-label{width:1280px;margin:0 auto 8px;padding:10px 16px;
+      background:#1E293B;border-radius:8px;
+      display:flex;align-items:center;gap:12px;}
+    .dir-label .dname{font-size:13px;font-weight:700;color:white;}
+    .dir-label .dtag{padding:2px 8px;background:#334155;border-radius:4px;color:#94A3B8;font-size:11px;}
+    .dir-label .ddesc{font-size:12px;color:#64748B;margin-left:4px;}
+    .mframe{width:1280px;min-height:720px;background:var(--background);
+      margin:0 auto;border-radius:12px;
+      box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;display:flex;flex-direction:column;}
+
+    /* TOP NAV */
+    .tnav{height:56px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;}
+    .tbrand{font-weight:700;font-size:15px;color:var(--brand);margin-right:auto;letter-spacing:-0.02em;}
+    .tuser{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);}
+    .avatar{width:28px;height:28px;border-radius:50%;background:var(--brand-subtle);
+      display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--brand);}
+
+    /* SIDEBAR */
+    .sidebar{width:256px;background:var(--surface);border-right:1px solid var(--border);
+      padding:16px;display:flex;flex-direction:column;gap:20px;flex-shrink:0;overflow-y:auto;}
+    .hw{background:var(--background);border:1px solid var(--border);border-radius:10px;padding:14px;}
+    .hw-label{font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;
+      letter-spacing:.06em;margin-bottom:10px;}
+    .hw-score-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+    .hw-num{font-size:22px;font-weight:700;}
+    .hw-num.y{color:var(--warning);}
+    .hw-num.g{color:var(--success);}
+    .hw-num.r{color:var(--danger);}
+    .hw-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+    .hw-fill{height:100%;border-radius:3px;}
+    .hw-fill.y{background:var(--warning);width:72%;}
+    .hw-fill.g{background:var(--success);width:88%;}
+    .hw-coaching{font-size:11px;color:var(--text-secondary);line-height:1.5;margin-bottom:10px;}
+    .hw-coaching strong{color:var(--text-primary);}
+    .btn-act{display:block;width:100%;padding:7px;background:var(--brand);color:white;
+      border:none;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;
+      font-family:'Inter',sans-serif;text-align:center;}
+    .navlinks{display:flex;flex-direction:column;gap:1px;}
+    .nlink{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;
+      font-size:13px;color:var(--text-secondary);cursor:pointer;}
+    .nlink:hover{background:var(--border);}
+    .nlink.active{background:var(--brand-subtle);color:var(--brand);font-weight:500;}
+    .nlink-icon{font-size:14px;width:18px;text-align:center;}
+    .sidebar-stat{font-size:11px;color:var(--text-tertiary);padding:0 4px;}
+    .sidebar-stat span{font-weight:600;color:var(--text-secondary);}
+
+    /* BOARD AREA */
+    .board-area{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+    .bheader{padding:14px 20px 12px;display:flex;align-items:center;
+      justify-content:space-between;border-bottom:1px solid var(--border);
+      background:var(--background);flex-shrink:0;}
+    .bheader-left{}
+    .btitle{font-size:15px;font-weight:600;}
+    .bmeta{font-size:11px;color:var(--text-tertiary);margin-top:1px;}
+    .btn-add{padding:6px 14px;background:var(--brand);color:white;border:none;
+      border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;
+      font-family:'Inter',sans-serif;display:flex;align-items:center;gap:5px;}
+    .fbar{padding:8px 20px;display:flex;gap:5px;border-bottom:1px solid var(--border);flex-shrink:0;}
+    .chip{padding:3px 10px;border-radius:9999px;font-size:11px;font-weight:500;
+      border:1px solid var(--border);background:var(--background);
+      color:var(--text-secondary);cursor:pointer;}
+    .chip.on{background:var(--brand-subtle);color:var(--brand);border-color:#C7D2FE;}
+    .sbanner{padding:7px 20px;background:#F0F9FF;border-bottom:1px solid #BAE6FD;
+      font-size:11px;color:#0369A1;display:flex;align-items:center;gap:6px;flex-shrink:0;}
+
+    /* BOARD ROWS */
+    .brow{display:flex;align-items:center;padding:0 20px;height:56px;
+      border-bottom:1px solid var(--border);cursor:pointer;}
+    .brow:hover{background:var(--surface);}
+    .brow.new{border-left:2px solid #818CF8;}
+    .brow.selected{background:var(--brand-subtle);}
+    .fav{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;
+      font-size:11px;font-weight:700;margin-right:12px;flex-shrink:0;}
+    .row-info{flex:1;min-width:0;}
+    .row-role{font-size:13px;font-weight:500;color:var(--text-primary);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .row-co{font-size:11px;color:var(--text-secondary);}
+    .row-right{display:flex;align-items:center;gap:16px;margin-left:auto;flex-shrink:0;}
+    .row-date{font-size:11px;color:var(--text-tertiary);width:72px;text-align:right;}
+
+    /* VITALITY BADGES */
+    .badge{display:inline-flex;align-items:center;gap:4px;
+      padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;}
+    .bdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+    .b-hot{background:var(--hot-bg);color:var(--hot-t);}
+    .b-hot .bdot{background:var(--hot-t);}
+    .b-deadline{background:var(--deadline-bg);color:var(--deadline-t);}
+    .b-deadline .bdot{background:var(--deadline-t);}
+    .b-active{background:var(--active-bg);color:var(--active-t);}
+    .b-active .bdot{background:var(--active-t);}
+    .b-dialogue{background:var(--dialogue-bg);color:var(--dialogue-t);}
+    .b-dialogue .bdot{background:var(--dialogue-t);}
+    .b-cooling{background:var(--cooling-bg);color:var(--cooling-t);}
+    .b-cooling .bdot{background:var(--cooling-t);}
+    .b-cold{background:var(--cold-bg);color:var(--cold-t);}
+    .b-cold .bdot{background:var(--cold-t);}
+    .b-ghosting{background:var(--ghosting-bg);color:var(--ghosting-t);}
+    .b-ghosting .bdot{background:var(--ghosting-t);}
+    .b-closed{background:var(--closed-bg);color:var(--closed-t);}
+    .b-closed .bdot{background:var(--closed-t);}
+
+    /* DETAIL PANEL (Dir D) */
+    .dpanel{width:360px;border-left:1px solid var(--border);flex-shrink:0;
+      background:var(--background);padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;}
+    .dp-role{font-size:17px;font-weight:700;}
+    .dp-co{font-size:13px;color:var(--text-secondary);margin-bottom:4px;}
+    .dp-section{}
+    .dp-slabel{font-size:10px;font-weight:600;color:var(--text-tertiary);
+      text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+    .dp-timeline{display:flex;flex-direction:column;gap:8px;}
+    .titem{display:flex;gap:10px;}
+    .tdot{width:7px;height:7px;border-radius:50%;background:var(--brand);margin-top:4px;flex-shrink:0;}
+    .ttext{font-size:12px;color:var(--text-secondary);line-height:1.4;}
+    .tdate{font-size:11px;color:var(--text-tertiary);}
+    .dp-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .dp-meta-item{background:var(--surface);border-radius:8px;padding:10px 12px;}
+    .dp-meta-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;}
+    .dp-meta-val{font-size:13px;font-weight:600;color:var(--text-primary);margin-top:2px;}
+    .dp-actions{display:flex;flex-direction:column;gap:6px;}
+    .dp-btn-primary{padding:8px;background:var(--brand);color:white;border:none;
+      border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;text-align:center;}
+    .dp-btn-sec{padding:8px;background:var(--surface);color:var(--text-primary);
+      border:1px solid var(--border);border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;text-align:center;}
+
+    /* CARD GRID (Dir E) */
+    .cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px;}
+    .ccard{background:var(--background);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:box-shadow .15s;}
+    .ccard:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);}
+    .ccard-head{display:flex;gap:10px;margin-bottom:10px;}
+    .cfav{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+    .crole{font-size:13px;font-weight:600;line-height:1.3;}
+    .cco{font-size:11px;color:var(--text-secondary);margin-top:2px;}
+    .ccard-foot{display:flex;justify-content:space-between;align-items:center;}
+    .cdate{font-size:11px;color:var(--text-tertiary);}
+
+    /* HEALTH BANNER (Dir C) */
+    .hbanner{padding:14px 20px;background:linear-gradient(135deg,#FFFBEB,#FEF9C3);
+      border-bottom:1px solid #FDE68A;display:flex;align-items:center;gap:16px;flex-shrink:0;}
+    .hb-score{font-size:28px;font-weight:700;color:var(--warning);}
+    .hb-divider{width:1px;height:36px;background:#FDE68A;}
+    .hb-text{}
+    .hb-label{font-size:10px;font-weight:600;color:#92400E;text-transform:uppercase;letter-spacing:.06em;}
+    .hb-instruction{font-size:13px;color:#78350F;margin-top:3px;font-weight:500;}
+    .hb-action{margin-left:auto;}
+    .hb-btn{padding:7px 16px;background:#D97706;color:white;border:none;border-radius:7px;
+      font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+    .hb-stats{display:flex;gap:20px;margin-left:20px;}
+    .hb-stat{text-align:center;}
+    .hb-stat-num{font-size:16px;font-weight:700;color:var(--text-primary);}
+    .hb-stat-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;}
+
+    /* TOP RAIL HEALTH (Dir B) */
+    .thr{display:flex;align-items:center;gap:10px;padding:0 16px;border-left:1px solid var(--border);}
+    .thr-score{font-size:13px;font-weight:700;color:var(--warning);}
+    .thr-instruction{font-size:11px;color:var(--text-secondary);max-width:220px;line-height:1.4;}
+    .thr-btn{padding:5px 12px;background:var(--brand);color:white;border:none;
+      border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;}
+
+    /* MINIMAL (Dir F) */
+    .mthdr{height:48px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0;}
+    .mtbrand{font-weight:700;font-size:13px;color:var(--text-primary);margin-right:auto;}
+    .health-pill{display:flex;align-items:center;gap:5px;padding:3px 10px;
+      border-radius:9999px;background:#FEF3C7;border:1px solid #FDE68A;
+      font-size:11px;font-weight:600;color:#92400E;cursor:pointer;}
+    .hpill-dot{width:6px;height:6px;border-radius:50%;background:#D97706;}
+    .mt-brow{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:1px solid var(--border);cursor:pointer;}
+    .mt-brow:hover{background:var(--surface);}
+    .mt-brow.new{border-left:2px solid #818CF8;}
+    .mt-coaching-banner{padding:10px 24px;background:var(--brand-subtle);
+      border-bottom:1px solid #C7D2FE;display:flex;align-items:center;
+      justify-content:space-between;flex-shrink:0;}
+    .mt-cb-text{font-size:12px;color:var(--brand);font-weight:500;}
+    .mt-cb-btn{padding:4px 12px;background:var(--brand);color:white;border:none;
+      border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;}
+
+    /* APP BODY SHELL */
+    .app-body{display:flex;flex:1;overflow:hidden;}
+  </style>
+</head>
+<body>
+
+<nav class="snav">
+  <span class="logo">FollowCV · Design Directions</span>
+  <button class="dbtn active" onclick="show('a',this)">A · Classic Sidebar</button>
+  <button class="dbtn" onclick="show('b',this)">B · Top Rail</button>
+  <button class="dbtn" onclick="show('c',this)">C · Health Forward</button>
+  <button class="dbtn" onclick="show('d',this)">D · Split Detail</button>
+  <button class="dbtn" onclick="show('e',this)">E · Card Grid</button>
+  <button class="dbtn" onclick="show('f',this)">F · Ultra-Minimal</button>
+  <span class="dir-note">Click rows to explore interactions</span>
+</nav>
+
+<!-- ============================================================ -->
+<!-- DIRECTION A: CLASSIC SIDEBAR                                 -->
+<!-- ============================================================ -->
+<div id="dir-a" class="direction active">
+  <div class="dir-label">
+    <span class="dname">Direction A — Classic Sidebar</span>
+    <span class="dtag">Health in sidebar</span>
+    <span class="dtag">Board as main stage</span>
+    <span class="ddesc">Left rail holds health score + coaching. Board has full visual weight. Reference design.</span>
+  </div>
+  <div class="mframe">
+    <div class="tnav">
+      <span class="tbrand">followcv</span>
+      <div class="tuser"><div class="avatar">MC</div>Marcus Chen</div>
+    </div>
+    <div class="app-body">
+      <div class="sidebar">
+        <div class="hw">
+          <div class="hw-label">Application Health</div>
+          <div class="hw-score-row">
+            <div class="hw-num y">72</div>
+            <div class="hw-bar"><div class="hw-fill y"></div></div>
+          </div>
+          <div class="hw-coaching"><strong>2 applications</strong> are overdue for follow-up — act today to stay visible.</div>
+          <div style="margin-top:10px;"><button class="btn-act">Follow up now →</button></div>
+        </div>
+        <div class="navlinks">
+          <div class="nlink active"><span class="nlink-icon">◼</span>My Board</div>
+          <div class="nlink"><span class="nlink-icon">◻</span>CV Versions</div>
+          <div class="nlink"><span class="nlink-icon">◎</span>Applications</div>
+          <div class="nlink"><span class="nlink-icon">⚙</span>Settings</div>
+        </div>
+        <div class="sidebar-stat">
+          <div>Active listings: <span>8</span></div>
+          <div style="margin-top:4px;">Last updated: <span>2 hr ago</span></div>
+        </div>
+      </div>
+      <div class="board-area">
+        <div class="sbanner">⟳ Board updated 3 listings while you were away · <strong style="color:#075985;">2 moved to Cooling, 1 new Deadline</strong></div>
+        <div class="bheader">
+          <div class="bheader-left">
+            <div class="btitle">My Applications</div>
+            <div class="bmeta">10 listings · Last updated 2 hours ago</div>
+          </div>
+          <button class="btn-add">+ Add listing</button>
+        </div>
+        <div class="fbar">
+          <div class="chip on">All</div>
+          <div class="chip">🔥 Hot</div>
+          <div class="chip">⏰ Deadline</div>
+          <div class="chip">✓ Active</div>
+          <div class="chip">❄ Cooling</div>
+          <div class="chip">· Cold</div>
+          <div class="chip">👻 Ghosting</div>
+        </div>
+        <div class="brow new">
+          <div class="fav" style="background:#FEF3C7;color:#92400E;">F</div>
+          <div class="row-info"><div class="row-role">Head of Design</div><div class="row-co">Figma · London, UK · £120–145k</div></div>
+          <div class="row-right">
+            <div class="badge b-deadline"><div class="bdot"></div>Deadline</div>
+            <div class="row-date">Tomorrow</div>
+          </div>
+        </div>
+        <div class="brow new">
+          <div class="fav" style="background:#FEF3C7;color:#92400E;">A</div>
+          <div class="row-info"><div class="row-role">Senior Product Designer</div><div class="row-co">Airbnb · Remote · $175–195k</div></div>
+          <div class="row-right">
+            <div class="badge b-hot"><div class="bdot"></div>Hot</div>
+            <div class="row-date">2 days ago</div>
+          </div>
+        </div>
+        <div class="brow">
+          <div class="fav" style="background:#DBEAFE;color:#1D4ED8;">L</div>
+          <div class="row-info"><div class="row-role">Staff Engineer</div><div class="row-co">Linear · Remote · $210–240k</div></div>
+          <div class="row-right">
+            <div class="badge b-dialogue"><div class="bdot"></div>In Dialogue</div>
+            <div class="row-date">8 days ago</div>
+          </div>
+        </div>
+        <div class="brow">
+          <div class="fav" style="background:#D1FAE5;color:#065F46;">N</div>
+          <div class="row-info"><div class="row-role">Product Manager</div><div class="row-co">Notion · New York, NY · $160–185k</div></div>
+          <div class="row-right">
+            <div class="badge b-active"><div class="bdot"></div>Active</div>
+            <div class="row-date">5 days ago</div>
+          </div>
+        </div>
+        <div class="brow">
+          <div class="fav" style="background:#D1FAE5;color:#065F46;">Lo</div>
+          <div class="row-info"><div class="row-role">Senior UX Engineer</div><div class="row-co">Loom · San Francisco, CA · $155–175k</div></div>
+          <div class="row-right">
+            <div class="badge b-active"><div class="bdot"></div>Active</div>
+            <div class="row-date">3 days ago</div>
+          </div>
+        </div>
+        <div class="brow new">
+          <div class="fav" style="background:#E0F2FE;color:#0369A1;">S</div>
+          <div class="row-info"><div class="row-role">Principal Designer</div><div class="row-co">Stripe · Dublin, IE · €120–140k</div></div>
+          <div class="row-right">
+            <div class="badge b-cooling"><div class="bdot"></div>Cooling</div>
+            <div class="row-date">12 days ago</div>
+          </div>
+        </div>
+        <div class="brow new">
+          <div class="fav" style="background:#F1F5F9;color:#475569;">V</div>
+          <div class="row-info"><div class="row-role">Design Lead</div><div class="row-co">Vercel · Remote · $145–165k</div></div>
+          <div class="row-right">
+            <div class="badge b-cooling"><div class="bdot"></div>Cooling</div>
+            <div class="row-date">9 days ago</div>
+          </div>
+        </div>
+        <div class="brow">
+          <div class="fav" style="background:#FEF9C3;color:#713F12;">M</div>
+          <div class="row-info"><div class="row-role">Senior Product Designer</div><div class="row-co">Miro · Remote · €90–110k</div></div>
+          <div class="row-right">
+            <div class="badge b-cold"><div class="bdot"></div>Cold</div>
+            <div class="row-date">22 days ago</div>
+          </div>
+        </div>
+        <div class="brow">
+          <div class="fav" style="background:#F3E8FF;color:#6D28D9;">D</div>
+          <div class="row-info"><div class="row-role">UX Lead</div><div class="row-co">Dropbox · Remote · $165–190k</div></div>
+          <div class="row-right">
+            <div class="badge b-ghosting"><div class="bdot"></div>Ghosting</div>
+            <div class="row-date">35 days ago</div>
+          </div>
+        </div>
+        <div class="brow">
+          <div class="fav" style="background:#F5F5F5;color:#737373;">Sl</div>
+          <div class="row-info" style="opacity:0.6;"><div class="row-role">Staff Designer</div><div class="row-co">Slack · Remote</div></div>
+          <div class="row-right">
+            <div class="badge b-closed"><div class="bdot"></div>Closed</div>
+            <div class="row-date" style="opacity:0.6;">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- DIRECTION B: TOP RAIL                                        -->
+<!-- ============================================================ -->
+<div id="dir-b" class="direction">
+  <div class="dir-label">
+    <span class="dname">Direction B — Top Rail</span>
+    <span class="dtag">No sidebar</span>
+    <span class="dtag">Health inline in nav</span>
+    <span class="ddesc">Health score and coaching live in the top navigation. Board takes full width. More screen space for listings.</span>
+  </div>
+  <div class="mframe">
+    <div class="tnav" style="gap:0;">
+      <span class="tbrand">followcv</span>
+      <div style="display:flex;gap:16px;margin-right:16px;">
+        <div style="font-size:12px;color:var(--text-secondary);padding:0 14px;cursor:pointer;border-bottom:2px solid var(--brand);font-weight:500;height:56px;display:flex;align-items:center;color:var(--brand);">Board</div>
+        <div style="font-size:12px;color:var(--text-secondary);padding:0 14px;cursor:pointer;height:56px;display:flex;align-items:center;">CV Versions</div>
+        <div style="font-size:12px;color:var(--text-secondary);padding:0 14px;cursor:pointer;height:56px;display:flex;align-items:center;">Applications</div>
+      </div>
+      <div class="thr">
+        <div style="font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;">Health</div>
+        <div class="thr-score">72 🟡</div>
+        <div class="thr-instruction">2 applications overdue for follow-up</div>
+        <button class="thr-btn">Follow up →</button>
+      </div>
+      <div class="tuser" style="margin-left:16px;"><div class="avatar">MC</div>Marcus</div>
+    </div>
+    <div class="board-area">
+      <div class="bheader">
+        <div class="bheader-left">
+          <div class="btitle">My Applications</div>
+          <div class="bmeta">10 listings · Updated 2 hours ago · <span style="color:#818CF8;">3 changes since your last visit</span></div>
+        </div>
+        <button class="btn-add">+ Add listing</button>
+      </div>
+      <div class="fbar">
+        <div class="chip on">All (10)</div>
+        <div class="chip">🔥 Hot (1)</div>
+        <div class="chip">⏰ Deadline (1)</div>
+        <div class="chip">✓ Active (2)</div>
+        <div class="chip">❄ Cooling (2)</div>
+        <div class="chip">· Cold (1)</div>
+        <div class="chip">👻 Ghosting (1)</div>
+        <div class="chip">✕ Closed (1)</div>
+      </div>
+      <div class="brow new">
+        <div class="fav" style="background:#FFEDD5;color:#9A3412;">F</div>
+        <div class="row-info"><div class="row-role">Head of Design</div><div class="row-co">Figma · London, UK · £120–145k</div></div>
+        <div class="row-right"><div class="badge b-deadline"><div class="bdot"></div>Deadline</div><div class="row-date">Tomorrow</div></div>
+      </div>
+      <div class="brow new">
+        <div class="fav" style="background:#FEF3C7;color:#92400E;">A</div>
+        <div class="row-info"><div class="row-role">Senior Product Designer</div><div class="row-co">Airbnb · Remote · $175–195k</div></div>
+        <div class="row-right"><div class="badge b-hot"><div class="bdot"></div>Hot</div><div class="row-date">2 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#DBEAFE;color:#1D4ED8;">L</div>
+        <div class="row-info"><div class="row-role">Staff Engineer</div><div class="row-co">Linear · Remote · $210–240k</div></div>
+        <div class="row-right"><div class="badge b-dialogue"><div class="bdot"></div>In Dialogue</div><div class="row-date">8 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#D1FAE5;color:#065F46;">N</div>
+        <div class="row-info"><div class="row-role">Product Manager</div><div class="row-co">Notion · New York, NY · $160–185k</div></div>
+        <div class="row-right"><div class="badge b-active"><div class="bdot"></div>Active</div><div class="row-date">5 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#D1FAE5;color:#065F46;">Lo</div>
+        <div class="row-info"><div class="row-role">Senior UX Engineer</div><div class="row-co">Loom · San Francisco, CA · $155–175k</div></div>
+        <div class="row-right"><div class="badge b-active"><div class="bdot"></div>Active</div><div class="row-date">3 days ago</div></div>
+      </div>
+      <div class="brow new">
+        <div class="fav" style="background:#E0F2FE;color:#0369A1;">S</div>
+        <div class="row-info"><div class="row-role">Principal Designer</div><div class="row-co">Stripe · Dublin, IE · €120–140k</div></div>
+        <div class="row-right"><div class="badge b-cooling"><div class="bdot"></div>Cooling</div><div class="row-date">12 days ago</div></div>
+      </div>
+      <div class="brow new">
+        <div class="fav" style="background:#F1F5F9;color:#475569;">V</div>
+        <div class="row-info"><div class="row-role">Design Lead</div><div class="row-co">Vercel · Remote · $145–165k</div></div>
+        <div class="row-right"><div class="badge b-cooling"><div class="bdot"></div>Cooling</div><div class="row-date">9 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#FEF9C3;color:#713F12;">M</div>
+        <div class="row-info"><div class="row-role">Senior Product Designer</div><div class="row-co">Miro · Remote · €90–110k</div></div>
+        <div class="row-right"><div class="badge b-cold"><div class="bdot"></div>Cold</div><div class="row-date">22 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#F3E8FF;color:#6D28D9;">D</div>
+        <div class="row-info"><div class="row-role">UX Lead</div><div class="row-co">Dropbox · Remote · $165–190k</div></div>
+        <div class="row-right"><div class="badge b-ghosting"><div class="bdot"></div>Ghosting</div><div class="row-date">35 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#F5F5F5;color:#737373;">Sl</div>
+        <div class="row-info" style="opacity:0.55;"><div class="row-role">Staff Designer</div><div class="row-co">Slack · Remote</div></div>
+        <div class="row-right"><div class="badge b-closed"><div class="bdot"></div>Closed</div><div class="row-date" style="opacity:0.55;">—</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- DIRECTION C: HEALTH FORWARD                                  -->
+<!-- ============================================================ -->
+<div id="dir-c" class="direction">
+  <div class="dir-label">
+    <span class="dname">Direction C — Health Forward</span>
+    <span class="dtag">Full-width health banner</span>
+    <span class="dtag">Coaching is the hero</span>
+    <span class="ddesc">The coaching instruction is the dominant element on screen. Users read the action before scanning the board.</span>
+  </div>
+  <div class="mframe">
+    <div class="tnav">
+      <span class="tbrand">followcv</span>
+      <div style="display:flex;gap:4px;margin-right:auto;margin-left:20px;">
+        <div class="chip on" style="font-size:12px;">Board</div>
+        <div class="chip" style="font-size:12px;">CV Versions</div>
+        <div class="chip" style="font-size:12px;">Applications</div>
+      </div>
+      <div class="tuser"><div class="avatar">MC</div>Marcus Chen</div>
+    </div>
+    <div class="hbanner">
+      <div class="hb-score">72</div>
+      <div class="hb-divider"></div>
+      <div class="hb-text">
+        <div class="hb-label">Application Health · Yellow Zone</div>
+        <div class="hb-instruction">2 applications are overdue for follow-up — act today to stay visible.</div>
+      </div>
+      <div class="hb-stats">
+        <div class="hb-stat"><div class="hb-stat-num">10</div><div class="hb-stat-label">Active</div></div>
+        <div class="hb-stat"><div class="hb-stat-num">2</div><div class="hb-stat-label">Urgent</div></div>
+        <div class="hb-stat"><div class="hb-stat-num">1</div><div class="hb-stat-label">Dialogue</div></div>
+      </div>
+      <div class="hb-action"><button class="hb-btn">Follow up now →</button></div>
+    </div>
+    <div class="board-area">
+      <div class="bheader">
+        <div class="bheader-left">
+          <div class="btitle">My Applications</div>
+          <div class="bmeta">10 listings · 3 updated while you were away</div>
+        </div>
+        <button class="btn-add">+ Add listing</button>
+      </div>
+      <div class="fbar">
+        <div class="chip on">All</div>
+        <div class="chip">🔥 Hot</div>
+        <div class="chip">⏰ Deadline</div>
+        <div class="chip">✓ Active</div>
+        <div class="chip">❄ Cooling</div>
+        <div class="chip">· Cold</div>
+        <div class="chip">👻 Ghosting</div>
+      </div>
+      <div class="brow new">
+        <div class="fav" style="background:#FFEDD5;color:#9A3412;">F</div>
+        <div class="row-info"><div class="row-role">Head of Design</div><div class="row-co">Figma · London, UK · £120–145k</div></div>
+        <div class="row-right"><div class="badge b-deadline"><div class="bdot"></div>Deadline</div><div class="row-date">Tomorrow</div></div>
+      </div>
+      <div class="brow new">
+        <div class="fav" style="background:#FEF3C7;color:#92400E;">A</div>
+        <div class="row-info"><div class="row-role">Senior Product Designer</div><div class="row-co">Airbnb · Remote · $175–195k</div></div>
+        <div class="row-right"><div class="badge b-hot"><div class="bdot"></div>Hot</div><div class="row-date">2 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#DBEAFE;color:#1D4ED8;">L</div>
+        <div class="row-info"><div class="row-role">Staff Engineer</div><div class="row-co">Linear · Remote · $210–240k</div></div>
+        <div class="row-right"><div class="badge b-dialogue"><div class="bdot"></div>In Dialogue</div><div class="row-date">8 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#D1FAE5;color:#065F46;">N</div>
+        <div class="row-info"><div class="row-role">Product Manager</div><div class="row-co">Notion · New York, NY · $160–185k</div></div>
+        <div class="row-right"><div class="badge b-active"><div class="bdot"></div>Active</div><div class="row-date">5 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#D1FAE5;color:#065F46;">Lo</div>
+        <div class="row-info"><div class="row-role">Senior UX Engineer</div><div class="row-co">Loom · San Francisco, CA · $155–175k</div></div>
+        <div class="row-right"><div class="badge b-active"><div class="bdot"></div>Active</div><div class="row-date">3 days ago</div></div>
+      </div>
+      <div class="brow new">
+        <div class="fav" style="background:#E0F2FE;color:#0369A1;">S</div>
+        <div class="row-info"><div class="row-role">Principal Designer</div><div class="row-co">Stripe · Dublin, IE · €120–140k</div></div>
+        <div class="row-right"><div class="badge b-cooling"><div class="bdot"></div>Cooling</div><div class="row-date">12 days ago</div></div>
+      </div>
+      <div class="brow new">
+        <div class="fav" style="background:#F1F5F9;color:#475569;">V</div>
+        <div class="row-info"><div class="row-role">Design Lead</div><div class="row-co">Vercel · Remote · $145–165k</div></div>
+        <div class="row-right"><div class="badge b-cooling"><div class="bdot"></div>Cooling</div><div class="row-date">9 days ago</div></div>
+      </div>
+      <div class="brow">
+        <div class="fav" style="background:#FEF9C3;color:#713F12;">M</div>
+        <div class="row-info"><div class="row-role">Senior Product Designer</div><div class="row-co">Miro · Remote · €90–110k</div></div>
+        <div class="row-right"><div class="badge b-cold"><div class="bdot"></div>Cold</div><div class="row-date">22 days ago</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- DIRECTION D: SPLIT DETAIL PANEL                              -->
+<!-- ============================================================ -->
+<div id="dir-d" class="direction">
+  <div class="dir-label">
+    <span class="dname">Direction D — Split Detail Panel</span>
+    <span class="dtag">List + detail</span>
+    <span class="dtag">No page navigation</span>
+    <span class="ddesc">Click a row to see full listing detail in the right panel without leaving the board. Ideal for power users who triage quickly.</span>
+  </div>
+  <div class="mframe">
+    <div class="tnav">
+      <span class="tbrand">followcv</span>
+      <div class="tuser" style="margin-left:auto;"><div class="avatar">MC</div>Marcus Chen</div>
+    </div>
+    <div class="app-body">
+      <div class="sidebar">
+        <div class="hw">
+          <div class="hw-label">Health Score</div>
+          <div class="hw-score-row"><div class="hw-num y">72</div><div class="hw-bar"><div class="hw-fill y"></div></div></div>
+          <div class="hw-coaching"><strong>2 applications</strong> overdue for follow-up.</div>
+          <div style="margin-top:10px;"><button class="btn-act">Follow up →</button></div>
+        </div>
+        <div class="navlinks">
+          <div class="nlink active"><span class="nlink-icon">◼</span>My Board</div>
+          <div class="nlink"><span class="nlink-icon">◻</span>CV Versions</div>
+          <div class="nlink"><span class="nlink-icon">⚙</span>Settings</div>
+        </div>
+      </div>
+      <div class="board-area" style="border-right:1px solid var(--border);min-width:0;">
+        <div class="bheader" style="padding:12px 16px;">
+          <div class="bheader-left"><div class="btitle" style="font-size:14px;">Applications</div><div class="bmeta">10 listings</div></div>
+          <button class="btn-add" style="font-size:11px;padding:5px 10px;">+ Add</button>
+        </div>
+        <div class="fbar" style="padding:8px 16px;">
+          <div class="chip on">All</div>
+          <div class="chip">⏰ Urgent</div>
+          <div class="chip">✓ Active</div>
+          <div class="chip">❄ Cold</div>
+        </div>
+        <div class="brow new selected" style="padding:0 16px;">
+          <div class="fav" style="background:#FFEDD5;color:#9A3412;">F</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Head of Design</div><div class="row-co" style="font-size:11px;">Figma</div></div>
+          <div class="row-right"><div class="badge b-deadline" style="font-size:10px;"><div class="bdot"></div>Deadline</div></div>
+        </div>
+        <div class="brow new" style="padding:0 16px;">
+          <div class="fav" style="background:#FEF3C7;color:#92400E;">A</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Senior Product Designer</div><div class="row-co" style="font-size:11px;">Airbnb</div></div>
+          <div class="row-right"><div class="badge b-hot" style="font-size:10px;"><div class="bdot"></div>Hot</div></div>
+        </div>
+        <div class="brow" style="padding:0 16px;">
+          <div class="fav" style="background:#DBEAFE;color:#1D4ED8;">L</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Staff Engineer</div><div class="row-co" style="font-size:11px;">Linear</div></div>
+          <div class="row-right"><div class="badge b-dialogue" style="font-size:10px;"><div class="bdot"></div>In Dialogue</div></div>
+        </div>
+        <div class="brow" style="padding:0 16px;">
+          <div class="fav" style="background:#D1FAE5;color:#065F46;">N</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Product Manager</div><div class="row-co" style="font-size:11px;">Notion</div></div>
+          <div class="row-right"><div class="badge b-active" style="font-size:10px;"><div class="bdot"></div>Active</div></div>
+        </div>
+        <div class="brow" style="padding:0 16px;">
+          <div class="fav" style="background:#D1FAE5;color:#065F46;">Lo</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Senior UX Engineer</div><div class="row-co" style="font-size:11px;">Loom</div></div>
+          <div class="row-right"><div class="badge b-active" style="font-size:10px;"><div class="bdot"></div>Active</div></div>
+        </div>
+        <div class="brow new" style="padding:0 16px;">
+          <div class="fav" style="background:#E0F2FE;color:#0369A1;">S</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Principal Designer</div><div class="row-co" style="font-size:11px;">Stripe</div></div>
+          <div class="row-right"><div class="badge b-cooling" style="font-size:10px;"><div class="bdot"></div>Cooling</div></div>
+        </div>
+        <div class="brow new" style="padding:0 16px;">
+          <div class="fav" style="background:#F1F5F9;color:#475569;">V</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Design Lead</div><div class="row-co" style="font-size:11px;">Vercel</div></div>
+          <div class="row-right"><div class="badge b-cooling" style="font-size:10px;"><div class="bdot"></div>Cooling</div></div>
+        </div>
+        <div class="brow" style="padding:0 16px;">
+          <div class="fav" style="background:#FEF9C3;color:#713F12;">M</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Sr. Product Designer</div><div class="row-co" style="font-size:11px;">Miro</div></div>
+          <div class="row-right"><div class="badge b-cold" style="font-size:10px;"><div class="bdot"></div>Cold</div></div>
+        </div>
+        <div class="brow" style="padding:0 16px;">
+          <div class="fav" style="background:#F3E8FF;color:#6D28D9;">D</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">UX Lead</div><div class="row-co" style="font-size:11px;">Dropbox</div></div>
+          <div class="row-right"><div class="badge b-ghosting" style="font-size:10px;"><div class="bdot"></div>Ghosting</div></div>
+        </div>
+        <div class="brow" style="padding:0 16px;opacity:0.6;">
+          <div class="fav" style="background:#F5F5F5;color:#737373;">Sl</div>
+          <div class="row-info"><div class="row-role" style="font-size:12px;">Staff Designer</div><div class="row-co" style="font-size:11px;">Slack</div></div>
+          <div class="row-right"><div class="badge b-closed" style="font-size:10px;"><div class="bdot"></div>Closed</div></div>
+        </div>
+      </div>
+      <!-- Detail Panel -->
+      <div class="dpanel">
+        <div>
+          <div class="dp-role">Head of Design</div>
+          <div class="dp-co">Figma · London, UK</div>
+          <div class="badge b-deadline" style="margin-top:6px;"><div class="bdot"></div>Deadline — tomorrow</div>
+        </div>
+        <div class="dp-section">
+          <div class="dp-slabel">Details</div>
+          <div class="dp-meta">
+            <div class="dp-meta-item"><div class="dp-meta-label">Salary</div><div class="dp-meta-val">£120–145k</div></div>
+            <div class="dp-meta-item"><div class="dp-meta-label">Location</div><div class="dp-meta-val">London, UK</div></div>
+            <div class="dp-meta-item"><div class="dp-meta-label">Posted</div><div class="dp-meta-val">Apr 28, 2026</div></div>
+            <div class="dp-meta-item"><div class="dp-meta-label">CV Version</div><div class="dp-meta-val">Not applied</div></div>
+          </div>
+        </div>
+        <div class="dp-section">
+          <div class="dp-slabel">Timeline</div>
+          <div class="dp-timeline">
+            <div class="titem"><div class="tdot" style="background:#FFEDD5;border:1.5px solid #9A3412;"></div><div><div class="ttext">Listing added via URL import</div><div class="tdate">Apr 30, 2026</div></div></div>
+            <div class="titem"><div class="tdot" style="background:#F97316;"></div><div><div class="ttext">Deadline detected — apply by tomorrow</div><div class="tdate">May 4, 2026 · Computed</div></div></div>
+          </div>
+        </div>
+        <div class="dp-section">
+          <div class="dp-slabel">Actions</div>
+          <div class="dp-actions">
+            <button class="dp-btn-primary">Record application →</button>
+            <button class="dp-btn-sec">Change status</button>
+            <button class="dp-btn-sec">Add note</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- DIRECTION E: CARD GRID                                       -->
+<!-- ============================================================ -->
+<div id="dir-e" class="direction">
+  <div class="dir-label">
+    <span class="dname">Direction E — Card Grid</span>
+    <span class="dtag">Airbnb-style cards</span>
+    <span class="dtag">Visual-first</span>
+    <span class="ddesc">Each listing is a card in a 3-column grid. More visual weight per entry. Good for smaller application volumes (under 12 listings).</span>
+  </div>
+  <div class="mframe">
+    <div class="tnav">
+      <span class="tbrand">followcv</span>
+      <div class="thr" style="margin-right:auto;">
+        <div style="font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;">Health</div>
+        <div class="thr-score">72 🟡</div>
+        <div class="thr-instruction">Follow up on 2 applications today</div>
+        <button class="thr-btn">Act →</button>
+      </div>
+      <button class="btn-add">+ Add listing</button>
+      <div class="tuser" style="margin-left:12px;"><div class="avatar">MC</div></div>
+    </div>
+    <div class="fbar" style="padding:10px 20px;">
+      <div class="chip on">All (10)</div>
+      <div class="chip">⏰ Urgent</div>
+      <div class="chip">✓ Active</div>
+      <div class="chip">❄ Cold</div>
+      <div class="chip">👻 Ghosted</div>
+    </div>
+    <div class="cgrid">
+      <div class="ccard" style="border-color:#FFEDD5;border-width:2px;">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#FFEDD5;color:#9A3412;">F</div>
+          <div><div class="crole">Head of Design</div><div class="cco">Figma · London, UK</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">£120–145k · Posted Apr 28</div>
+        <div class="ccard-foot">
+          <div class="badge b-deadline"><div class="bdot"></div>Deadline</div>
+          <div class="cdate">Due tomorrow</div>
+        </div>
+      </div>
+      <div class="ccard">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#FEF3C7;color:#92400E;">A</div>
+          <div><div class="crole">Senior Product Designer</div><div class="cco">Airbnb · Remote</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">$175–195k · Posted May 3</div>
+        <div class="ccard-foot">
+          <div class="badge b-hot"><div class="bdot"></div>Hot</div>
+          <div class="cdate">2 days ago</div>
+        </div>
+      </div>
+      <div class="ccard">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#DBEAFE;color:#1D4ED8;">L</div>
+          <div><div class="crole">Staff Engineer</div><div class="cco">Linear · Remote</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">$210–240k · Applied Apr 27</div>
+        <div class="ccard-foot">
+          <div class="badge b-dialogue"><div class="bdot"></div>In Dialogue</div>
+          <div class="cdate">Interview Thu</div>
+        </div>
+      </div>
+      <div class="ccard">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#D1FAE5;color:#065F46;">N</div>
+          <div><div class="crole">Product Manager</div><div class="cco">Notion · New York</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">$160–185k · Applied Apr 30</div>
+        <div class="ccard-foot">
+          <div class="badge b-active"><div class="bdot"></div>Active</div>
+          <div class="cdate">5 days ago</div>
+        </div>
+      </div>
+      <div class="ccard">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#D1FAE5;color:#065F46;">Lo</div>
+          <div><div class="crole">Senior UX Engineer</div><div class="cco">Loom · San Francisco</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">$155–175k · Applied May 2</div>
+        <div class="ccard-foot">
+          <div class="badge b-active"><div class="bdot"></div>Active</div>
+          <div class="cdate">3 days ago</div>
+        </div>
+      </div>
+      <div class="ccard">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#E0F2FE;color:#0369A1;">S</div>
+          <div><div class="crole">Principal Designer</div><div class="cco">Stripe · Dublin</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">€120–140k · Applied Apr 23</div>
+        <div class="ccard-foot">
+          <div class="badge b-cooling"><div class="bdot"></div>Cooling</div>
+          <div class="cdate">12 days ago</div>
+        </div>
+      </div>
+      <div class="ccard">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#F1F5F9;color:#475569;">V</div>
+          <div><div class="crole">Design Lead</div><div class="cco">Vercel · Remote</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">$145–165k · Applied Apr 26</div>
+        <div class="ccard-foot">
+          <div class="badge b-cooling"><div class="bdot"></div>Cooling</div>
+          <div class="cdate">9 days ago</div>
+        </div>
+      </div>
+      <div class="ccard" style="opacity:0.7;">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#FEF9C3;color:#713F12;">M</div>
+          <div><div class="crole">Senior Product Designer</div><div class="cco">Miro · Remote</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">€90–110k · Applied Apr 13</div>
+        <div class="ccard-foot">
+          <div class="badge b-cold"><div class="bdot"></div>Cold</div>
+          <div class="cdate">22 days ago</div>
+        </div>
+      </div>
+      <div class="ccard" style="opacity:0.55;">
+        <div class="ccard-head">
+          <div class="cfav" style="background:#F3E8FF;color:#6D28D9;">D</div>
+          <div><div class="crole">UX Lead</div><div class="cco">Dropbox · Remote</div></div>
+        </div>
+        <div style="margin-bottom:10px;font-size:12px;color:var(--text-secondary);">$165–190k · Applied Apr 1</div>
+        <div class="ccard-foot">
+          <div class="badge b-ghosting"><div class="bdot"></div>Ghosting</div>
+          <div class="cdate">35 days ago</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- DIRECTION F: ULTRA-MINIMAL                                   -->
+<!-- ============================================================ -->
+<div id="dir-f" class="direction">
+  <div class="dir-label">
+    <span class="dname">Direction F — Ultra-Minimal</span>
+    <span class="dtag">Bare chrome</span>
+    <span class="dtag">Board is everything</span>
+    <span class="ddesc">Hair-thin header. Health as a small status chip. All visual weight on the board. For users who want to get in, scan, and leave.</span>
+  </div>
+  <div class="mframe">
+    <div class="mthdr">
+      <span class="mtbrand">followcv</span>
+      <div class="health-pill"><div class="hpill-dot"></div>72 — 2 follow-ups due</div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <button class="btn-add" style="padding:5px 12px;font-size:11px;">+ Add</button>
+        <div class="avatar">MC</div>
+      </div>
+    </div>
+    <div class="mt-coaching-banner">
+      <span class="mt-cb-text">→ Follow up on Principal Designer (Stripe) and Design Lead (Vercel) today</span>
+      <button class="mt-cb-btn">Mark done</button>
+    </div>
+    <div class="fbar" style="padding:8px 24px;">
+      <div class="chip on">All</div>
+      <div class="chip">⏰ Urgent</div>
+      <div class="chip">✓ Active</div>
+      <div class="chip">❄ Cooling</div>
+      <div class="chip">· Cold+</div>
+    </div>
+    <div class="mt-brow new">
+      <div class="fav" style="background:#FFEDD5;color:#9A3412;margin-right:14px;">F</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Head of Design</div><div class="row-co">Figma · London</div></div>
+      <div class="row-right"><div class="badge b-deadline"><div class="bdot"></div>Deadline</div><div class="row-date">Tomorrow</div></div>
+    </div>
+    <div class="mt-brow new">
+      <div class="fav" style="background:#FEF3C7;color:#92400E;margin-right:14px;">A</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Senior Product Designer</div><div class="row-co">Airbnb · Remote</div></div>
+      <div class="row-right"><div class="badge b-hot"><div class="bdot"></div>Hot</div><div class="row-date">2d ago</div></div>
+    </div>
+    <div class="mt-brow">
+      <div class="fav" style="background:#DBEAFE;color:#1D4ED8;margin-right:14px;">L</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Staff Engineer</div><div class="row-co">Linear · Remote</div></div>
+      <div class="row-right"><div class="badge b-dialogue"><div class="bdot"></div>In Dialogue</div><div class="row-date">8d ago</div></div>
+    </div>
+    <div class="mt-brow">
+      <div class="fav" style="background:#D1FAE5;color:#065F46;margin-right:14px;">N</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Product Manager</div><div class="row-co">Notion · New York</div></div>
+      <div class="row-right"><div class="badge b-active"><div class="bdot"></div>Active</div><div class="row-date">5d ago</div></div>
+    </div>
+    <div class="mt-brow">
+      <div class="fav" style="background:#D1FAE5;color:#065F46;margin-right:14px;">Lo</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Senior UX Engineer</div><div class="row-co">Loom · San Francisco</div></div>
+      <div class="row-right"><div class="badge b-active"><div class="bdot"></div>Active</div><div class="row-date">3d ago</div></div>
+    </div>
+    <div class="mt-brow new">
+      <div class="fav" style="background:#E0F2FE;color:#0369A1;margin-right:14px;">S</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Principal Designer</div><div class="row-co">Stripe · Dublin</div></div>
+      <div class="row-right"><div class="badge b-cooling"><div class="bdot"></div>Cooling</div><div class="row-date">12d ago</div></div>
+    </div>
+    <div class="mt-brow new">
+      <div class="fav" style="background:#F1F5F9;color:#475569;margin-right:14px;">V</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Design Lead</div><div class="row-co">Vercel · Remote</div></div>
+      <div class="row-right"><div class="badge b-cooling"><div class="bdot"></div>Cooling</div><div class="row-date">9d ago</div></div>
+    </div>
+    <div class="mt-brow" style="opacity:0.65;">
+      <div class="fav" style="background:#FEF9C3;color:#713F12;margin-right:14px;">M</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Senior Product Designer</div><div class="row-co">Miro · Remote</div></div>
+      <div class="row-right"><div class="badge b-cold"><div class="bdot"></div>Cold</div><div class="row-date">22d ago</div></div>
+    </div>
+    <div class="mt-brow" style="opacity:0.5;">
+      <div class="fav" style="background:#F3E8FF;color:#6D28D9;margin-right:14px;">D</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">UX Lead</div><div class="row-co">Dropbox · Remote</div></div>
+      <div class="row-right"><div class="badge b-ghosting"><div class="bdot"></div>Ghosting</div><div class="row-date">35d ago</div></div>
+    </div>
+    <div class="mt-brow" style="opacity:0.35;">
+      <div class="fav" style="background:#F5F5F5;color:#737373;margin-right:14px;">Sl</div>
+      <div class="row-info" style="flex:1;"><div class="row-role" style="font-size:13px;">Staff Designer</div><div class="row-co">Slack · Remote</div></div>
+      <div class="row-right"><div class="badge b-closed"><div class="bdot"></div>Closed</div><div class="row-date">—</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function show(id, btn) {
+    document.querySelectorAll('.direction').forEach(d => d.classList.remove('active'));
+    document.querySelectorAll('.dbtn').forEach(b => b.classList.remove('active'));
+    document.getElementById('dir-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>
