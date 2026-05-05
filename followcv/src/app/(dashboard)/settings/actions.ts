@@ -41,10 +41,7 @@ export async function updateSettings(
   return { type: "success", message: "Settings saved" }
 }
 
-export async function deleteUserAccount(
-  _prevState: SettingsActionState,
-  _formData: FormData
-): Promise<SettingsActionState> {
+export async function deleteUserAccount(): Promise<SettingsActionState> {
   const session = await auth()
   if (!session?.user?.id) return { type: "error", message: "Not authenticated" }
 
@@ -54,10 +51,7 @@ export async function deleteUserAccount(
   return null
 }
 
-export async function revokeGmailToken(
-  _prevState: SettingsActionState,
-  _formData: FormData
-): Promise<SettingsActionState> {
+export async function revokeGmailToken(): Promise<SettingsActionState> {
   const session = await auth()
   if (!session?.user?.id) return { type: "error", message: "Not authenticated" }
 
