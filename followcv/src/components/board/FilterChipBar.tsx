@@ -1,9 +1,9 @@
 "use client"
 
-import { Menu } from "@base-ui/react/menu"
-import { ChevronDown, X } from "lucide-react"
+import { X } from "lucide-react"
 import type { VitalityState } from "@/generated/prisma/client"
 import { VITALITY_BADGE_CONFIG } from "@/components/vitality/VitalityBadge"
+import { Dropdown } from "@/components/ui/Dropdown"
 import type { SortOption } from "./applyBoardFilters"
 import { cn } from "@/lib/utils"
 
@@ -23,6 +23,12 @@ const SORT_LABELS: Record<SortOption, string> = {
   company: "Company",
   deadline: "Deadline",
 }
+
+const SORT_ITEMS = (Object.keys(SORT_LABELS) as SortOption[]).map((value) => ({
+  value,
+  label: SORT_LABELS[value],
+  rightHint: "current",
+}))
 
 type Props = {
   selectedStates: VitalityState[]
@@ -88,7 +94,15 @@ export function FilterChipBar({
 
       {/* Row 2 — sort + search on the left, umbrella clear-all on the right */}
       <div className="flex flex-wrap items-center gap-2">
-        <SortMenu sort={sort} onSelect={onSetSort} />
+        <Dropdown<SortOption>
+          ariaLabel="Sort listings"
+          triggerLabel={`Sort: ${SORT_LABELS[sort]}`}
+          items={SORT_ITEMS}
+          value={sort}
+          onSelect={onSetSort}
+          align="start"
+          size="sm"
+        />
         <SearchInput value={query} onChange={onSetQuery} />
 
         {isAnyFilterActive && (
@@ -150,53 +164,6 @@ function Chip({
     >
       {children}
     </button>
-  )
-}
-
-function SortMenu({
-  sort,
-  onSelect,
-}: {
-  sort: SortOption
-  onSelect: (s: SortOption) => void
-}) {
-  return (
-    <Menu.Root>
-      <Menu.Trigger
-        aria-label="Sort listings"
-        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors duration-150 hover:bg-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-        render={<button type="button" />}
-      >
-        Sort: {SORT_LABELS[sort]}
-        <ChevronDown size={12} aria-hidden />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner sideOffset={4} align="end">
-          <Menu.Popup
-            className="min-w-[180px] rounded-md border bg-white py-1 text-sm shadow-md"
-            style={{ borderColor: "var(--color-border, #e2e8f0)" }}
-          >
-            {(Object.keys(SORT_LABELS) as SortOption[]).map((opt) => (
-              <Menu.Item
-                key={opt}
-                onClick={() => onSelect(opt)}
-                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 outline-none data-[highlighted]:bg-slate-100"
-              >
-                <span className="flex-1">{SORT_LABELS[opt]}</span>
-                {sort === opt && (
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--color-text-tertiary)" }}
-                  >
-                    current
-                  </span>
-                )}
-              </Menu.Item>
-            ))}
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
   )
 }
 
