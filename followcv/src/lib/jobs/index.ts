@@ -5,7 +5,9 @@ export const JOB_VITALITY_RECOMPUTE = "vitality-recompute"
 const JOB_VITALITY_RECOMPUTE_DLQ = "vitality-recompute-dlq"
 
 export function createBoss(): PgBoss {
-  return new PgBoss(process.env.DATABASE_URL!)
+  const url = new URL(process.env.DATABASE_URL!)
+  url.searchParams.delete("channel_binding")
+  return new PgBoss(url.toString())
 }
 
 export async function ensureQueues(boss: PgBoss): Promise<void> {
