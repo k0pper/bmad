@@ -24,6 +24,7 @@ So that I have a versioned history of my CVs to choose from when applying.
 8. Successful upload re-renders the list (`router.refresh()`), shows a `Toast` with copy `CV "{name}" uploaded.`, and resets the dialog. Validation errors (wrong type, too large, network failure on PUT, cap reached) surface inline in the dialog without dismissing it.
 9. The flow is keyboard-navigable: Tab cycles through file picker → name input → Cancel → Upload; `Enter` confirms; `Esc` closes the dialog without uploading. The CV list is keyboard-accessible (download / view actions are real buttons).
 10. All Server Actions return the typed `ActionResult<T>` union and never throw to the client.
+11. **Account deletion cleans up CV blobs.** When a user deletes their account, the existing `deleteAccount()` flow first collects every `cvVersion.s3Key` belonging to the user and batches them through `del()` from `@vercel/blob` before deleting the User row. The DB cascade handles the relational rows; the blob cleanup is best-effort (a storage outage doesn't block the deletion, but the orphans become a future cleanup-job concern).
 
 ## Tasks / Subtasks
 
@@ -110,9 +111,18 @@ The grid layout requires page-1 thumbnails. Three options were considered:
 - Render `<Page pageNumber={1} width={240} />` — fixed width keeps the canvas size predictable; the card's aspect-ratio container handles the visual sizing.
 - Provide `loading` and `error` slots (skeleton + fallback icon respectively) — never crash a card if a single PDF fails to parse.
 
-**Server-side preview-URL pre-mint:**
+**Critical: previews go through a same-origin proxy, NOT directly at the blob URL.**
 
-Each card needs a signed URL to render. Two options: client fetches via `requestCvDownloadUrl` per-card on mount (N round-trips), or server pre-mints all URLs in the `/cv` page Server Component using `head()` and passes them to the Client Component as props (one batched fetch). The pre-mint approach is in use here — fewer round-trips, URLs are valid for the immediate session, no flash of "loading" on first paint. If `head()` fails for one row (blob deleted, store down), that card falls back to a placeholder icon while the others render.
+react-pdf does an XHR `fetch()` to load the PDF bytes. Vercel Blob's private signed URLs are not CORS-friendly for cross-origin XHR — the browser blocks the request and react-pdf falls back to its error slot. (Browser navigation, which is what `window.open()` triggers for the Download button, isn't CORS-checked, which is why downloads work via signed URLs.)
+
+The fix is a same-origin proxy route at `src/app/api/cv/[id]/file/route.ts`:
+
+1. Auth-check (`auth()` returns the session, otherwise 401).
+2. Ownership check via `findFirst({ where: { id, userId } })` — return 404 (not 403) for non-owners so the existence of someone else's CV is never leaked.
+3. Stream the bytes from Vercel Blob via `get(cv.s3Key, { access: 'private' })`.
+4. Respond with `Content-Type: application/pdf`, `Content-Disposition: inline`, and a 5-minute private cache-control so re-renders within a session don't re-stream.
+
+`<CvPreview url={`/api/cv/${id}/file`} />` is what the card uses. The blob URL never leaves the server. Bandwidth flows through the Vercel Function instead of directly browser→Blob — a small cost trade for a correct, secure preview path. The signed-URL flow remains in place for downloads (`requestCvDownloadUrl` → `head()` → `window.open(url)`), where CORS isn't a factor.
 
 ### What's already in place
 
@@ -334,7 +344,10 @@ Add a third `<NavLink href="/cv">CVs</NavLink>` in `src/app/(dashboard)/layout.t
 - `src/components/cv/computeFileHash.test.ts` — NEW
 - `src/components/cv/formatFileSize.ts` — NEW
 - `src/components/cv/formatFileSize.test.ts` — NEW
-- `src/app/(dashboard)/cv/page.tsx` — NEW (Server Component pre-mints preview URLs via `head()`)
+- `src/app/(dashboard)/cv/page.tsx` — NEW (Server Component; preview URLs are NOT pre-minted any more — cards fetch via the same-origin `/api/cv/[id]/file` proxy)
+- `src/app/api/cv/[id]/file/route.ts` — NEW (CORS-free preview proxy; auth + ownership check + Vercel Blob `get()` stream)
+- `src/lib/account/service.ts` — UPDATE (delete user's CV blobs before DB cascade; replace `deleteMany` on `gmailToken` with single-row `findFirst + delete` to satisfy the Neon HTTP rule)
+- `src/lib/account/service.test.ts` — UPDATE (cover the blob-cleanup path + new gmail-revoke pattern)
 - `src/app/(dashboard)/cv/loading.tsx` — NEW (skeleton matches the card grid)
 - `src/app/(dashboard)/layout.tsx` — UPDATE (CVs nav link)
 - `followcv/project-context.md` — UPDATE (Vercel Blob section)
@@ -432,3 +445,4 @@ claude-opus-4-7[1m]
 | 2026-05-06 | All tasks implemented; lint, types, 187 tests green; status → review | claude-opus-4-7 |
 | 2026-05-06 | Switched store to **private** (matches Vercel config); download path mints fresh signed URL via `head()` on every request | claude-opus-4-7 |
 | 2026-05-06 | Replaced list view with **card grid + react-pdf page-1 thumbnails**; preview URLs pre-minted in the page Server Component | claude-opus-4-7 |
+| 2026-05-06 | Switched preview to a same-origin proxy (`/api/cv/[id]/file`) — CORS blocked direct XHR to private Vercel Blob URLs; account deletion now deletes CV blobs before the DB cascade; revokeGmailAccess now uses single-row delete (no `deleteMany`) | claude-opus-4-7 |

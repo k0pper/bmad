@@ -13,7 +13,6 @@ type CvVersionRow = {
   name: string
   fileSize: number
   uploadedAt: Date
-  previewUrl: string | null
 }
 
 type CapInfo = {
@@ -130,7 +129,7 @@ function CvCard({
       className="group flex flex-col overflow-hidden rounded-lg border border-border bg-background transition-shadow duration-150 hover:shadow-md"
     >
       <div className="relative">
-        <CvPreview url={cv.previewUrl} name={cv.name} />
+        <CvPreview url={`/api/cv/${cv.id}/file`} name={cv.name} />
         {isActive && (
           <span
             className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider shadow-sm"

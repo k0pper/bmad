@@ -67,8 +67,11 @@ Do **NOT** pass `onUploadCompleted` to `handleUpload` in the upload-token API ro
 **Pattern for new code:**
 
 - Direct client uploads use `@vercel/blob/client`'s `upload()` with `handleUploadUrl` pointing at an API route that wraps `handleUpload({ onBeforeGenerateToken })` for auth + cap checks. Omit `onUploadCompleted`.
-- Server Actions that need to issue a download URL: `findFirst` scoped to `session.user.id`, then `head(cvVersion.s3Key)` and return `meta.url`.
+- Server Actions that need to issue a download URL: `findFirst` scoped to `session.user.id`, then `head(cvVersion.s3Key)` and return `meta.url`. Browser navigation (download click → `window.open(url)`) is not subject to CORS, so this works for the download flow.
+- **Browser-side `fetch()` of private blob URLs is blocked by CORS**, so any flow that XHRs the bytes (PDF preview rendering, image thumbnailing, etc.) must go through a same-origin proxy route. The pattern is in [`src/app/api/cv/[id]/file/route.ts`](../followcv/src/app/api/cv/[id]/file/route.ts): auth + ownership check, then `get(cv.s3Key, { access: 'private' })` and stream the result back. Don't expose blob URLs to client-side `fetch`.
 - The `CvVersion.s3Key` column name is a misnomer (legacy from the R2 draft) — it stores the Vercel Blob URL. Don't rename without a coordinated migration.
+
+**Account deletion must clean up blobs.** `prisma.user.delete()` cascades the DB rows but doesn't touch Vercel Blob storage. [`deleteAccount()`](../followcv/src/lib/account/service.ts) collects every `cvVersion.s3Key` for the user and calls `del(urls)` from `@vercel/blob` before the DB cascade. Any new schema model that owns blob URLs must extend this cleanup or implement an equivalent — orphaned blobs are a privacy and storage-cost concern.
 
 ## Schema columns that mean something different than they look
 
