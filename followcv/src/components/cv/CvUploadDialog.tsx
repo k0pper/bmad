@@ -92,7 +92,11 @@ export function CvUploadDialog({ open, onOpenChange }: Props) {
     let blobUrl: string
     try {
       const blob = await upload(`cv-versions/${file.name}`, file, {
-        access: "public",
+        // The Vercel Blob store is configured as private — the access mode
+        // here must match the store's configuration. Private blobs are not
+        // publicly fetchable; the URL returned in `blob.url` carries a
+        // signature understood by Vercel Blob.
+        access: "private",
         handleUploadUrl: "/api/cv/upload-token",
         clientPayload: JSON.stringify({ name: finalName, fileHash }),
       })
