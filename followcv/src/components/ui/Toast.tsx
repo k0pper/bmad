@@ -23,14 +23,17 @@ export function Toast({ message, durationSeconds = 5, action, onDismiss }: Props
   const dismissButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    // Dismiss any other toast that may be active.
-    window.dispatchEvent(new CustomEvent("toast-show"))
+    // Dismiss any other toast that may be active. The dispatch must run BEFORE
+    // we subscribe — otherwise we'd dismiss ourselves. Subscribing via
+    // queueMicrotask (the previous approach) leaked handlers under React
+    // strict-mode dev because cleanup tried to removeEventListener before the
+    // microtask had actually added the listener; the leaked handler then fired
+    // on the next re-render and tore the toast down ~50ms after it appeared.
     function handleOtherShown() {
       onDismiss()
     }
-    queueMicrotask(() => {
-      window.addEventListener("toast-show", handleOtherShown)
-    })
+    window.dispatchEvent(new CustomEvent("toast-show"))
+    window.addEventListener("toast-show", handleOtherShown)
     return () => {
       window.removeEventListener("toast-show", handleOtherShown)
     }
