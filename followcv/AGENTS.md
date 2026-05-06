@@ -3,3 +3,7 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
+
+# Project context
+
+See [project-context.md](project-context.md) for project-specific constraints and conventions (Prisma + Neon HTTP transaction limits, cache invalidation pattern, Server Action contract).
