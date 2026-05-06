@@ -388,7 +388,7 @@ The URL import teaches the passive model by doing it. The first return teaches s
 **URL Import — step by step:**
 
 1. **Initiation:** "Add listing" button in the top-right (and as the dominant empty-state CTA). Click → compact import drawer opens (not a full-page modal).
-2. **Input:** Single URL field, auto-focused. Paste triggers immediate scrape request — no submit button needed; paste = initiate. Loading state: spinner + "Fetching listing details..."
+2. **Input:** Single URL field, auto-focused. Paste triggers immediate scrape request — no submit button needed; paste = initiate. Loading state: skeleton field rows (label + input shapes) inside a subtle bordered card, announced via `role="status"` / `aria-live="polite"`. No spinner.
 3. **Population:** Fields appear as data resolves — role, company, location, salary, posting date. Populated fields carry a subtle "filled" visual state. Fields that couldn't be populated are visually distinct and labelled "Add manually."
 4. **Review:** User scans populated fields. One click confirms ("Add to board"); any field is inline-editable before confirming. No required fields beyond role + company.
 5. **Completion:** Drawer closes. New listing appears at the top of the board with its computed vitality state. Toast: "[Role] at [Company] added." Board is now the focus — no redirect, no celebration screen.
@@ -445,10 +445,32 @@ The URL import teaches the passive model by doing it. The first return teaches s
 All badge combinations meet WCAG AA (4.5:1) on white. Each badge carries icon + label — no state communicates through colour alone.
 
 **Interactive states:**
-- Hover (board rows): `slate-50` background
-- Selected/active: `indigo-50` background + `indigo-600` 2px left border
-- Focus ring: `indigo-600` at 2px offset, meets 3:1 focus indicator contrast
-- Disabled: 50% opacity on text and icon, `not-allowed` cursor
+
+Every actionable element — buttons, sidebar links, back-to-board pills, drawer close, footer sign-out — must visibly respond on hover. Static-looking buttons (a sign-out that doesn't tint, a nav link with no rail) read as broken. Treatments:
+
+- **Board rows (hover):** `slate-50` background
+- **Sidebar nav links:** idle `text-secondary` on transparent → hover `bg-brand-subtle/60` + `text-brand`; active route gets full `bg-brand-subtle` + `text-brand` and a 2px left rail in `--brand`. Transition `colors 150ms ease-out`. Active state set via `aria-current="page"`.
+- **Primary buttons (`brand` variant):** `bg-brand` → hover `bg-brand-hover` + `shadow-sm`; active translates 1px down (`active:translate-y-px`).
+- **Outline buttons:** `bg-background` border → hover `bg-muted` + slightly darker border + `shadow-sm`.
+- **Ghost buttons (sidebar sign-out, drawer close, in-row ghost actions):** transparent → hover `bg-brand-subtle` + `text-brand`. Used wherever a button needs to feel low-stakes but never silent.
+- **Inline text actions ("Enter manually", "Try a different URL"):** `text-secondary`/`text-brand` → hover gains underline + `text-brand`.
+- **Focus ring:** `--brand` at 2px offset (`focus-visible:ring-2 focus-visible:ring-brand/40`), meets 3:1 focus indicator contrast.
+- **Disabled:** 50% opacity, `pointer-events-none` (no hover state shown).
+
+All hover transitions use `duration-150 ease-out` — fast enough to feel direct, slow enough to register.
+
+### Brand Mark
+
+The FollowCV identity is a logo-mark + wordmark pair, intentionally minimal:
+
+- **Mark:** 32×32 rounded square (`rx=8`) in `--brand` indigo. Inside it, a stylised "F" rendered as three white strokes (vertical stem + two ascending rungs) plus a small white dot in the lower-right quadrant. The dot reads as a signal/recency accent — it ties the mark to the product's recency-dot pattern on the board.
+- **Wordmark:** "Follow" in `--text-primary`, "CV" in `--brand`. Inter, semibold, tight tracking. The colour split lets the mark and wordmark share a single accent without doubling visual weight.
+- **Sizes:** `sm` (22px mark, `text-base`) for inline use; `md` (28px mark, `text-lg`) for the dashboard sidebar; `lg` (40px mark, `text-2xl`) for the login screen.
+- **Surfaces:** Sidebar (md, with wordmark) and login (lg, with wordmark, centred). Favicon and any future external surface (OG image, marketing) will use the mark only.
+- **Implementation:** [src/components/shared/Logo.tsx](../../followcv/src/components/shared/Logo.tsx). Inline SVG — no external asset, no font dependency for the mark, scales without rasterisation.
+- **Accessibility:** Mark carries `role="img"` + `aria-label="FollowCV logo"`; wordmark text remains real text for screen readers and search.
+
+Why a mark at all: the previous treatment was wordmark-only at `text-base` weight 600, which read as plain UI text rather than identity. The mark gives the sidebar a visual anchor point and earns the small footprint of vertical space at the top of the rail.
 
 ### Typography System
 
@@ -974,14 +996,16 @@ All custom components use only CSS variable design tokens. No hardcoded colours 
 
 Three-level hierarchy. At most one primary button visible per screen at any time.
 
-| Level | Style | Usage | Examples |
-|---|---|---|---|
-| **Primary** | `bg-brand text-white` (indigo-600) | One per view — the recommended next action | "Add to board", "Confirm application", "Follow up now" |
-| **Secondary** | `bg-surface border text-primary` | Supporting actions alongside primary | "Back", "Change status", "Add note" |
-| **Ghost** | `bg-transparent text-secondary` | Dismissal, low-stakes exits | "Cancel", "Skip", "Not now" |
-| **Destructive** | `bg-red-600 text-white` | Irreversible actions only — never the primary button on a screen | Archive listing, delete account |
+| Level | Style | Hover | Usage | Examples |
+|---|---|---|---|---|
+| **Primary (`brand`)** | `bg-brand text-white` | `bg-brand-hover` + `shadow-sm` | One per view — the recommended next action | "Add to board", "Add listing", "Save changes" |
+| **Secondary (`outline`)** | `bg-background border-border text-primary` | `bg-muted` + `shadow-sm` | Supporting actions alongside primary | "Sign in with Google", "Archive listing", "View existing listing" |
+| **Ghost** | `bg-transparent text-secondary` | `bg-brand-subtle` + `text-brand` | Dismissal, low-stakes exits, sidebar sign-out, drawer close | "Sign out", "Cancel", "Close drawer" |
+| **Destructive** | `bg-destructive/10 text-destructive` | `bg-destructive/20` | Irreversible actions only — never the primary button on a screen | Delete account, Revoke Gmail |
 
-**Disabled state:** 50% opacity, `cursor-not-allowed`. Never use disabled buttons to hide unavailable actions — use a tooltip explaining why, or hide the button entirely.
+**Single source of truth:** All buttons must use [src/components/ui/button.tsx](../../followcv/src/components/ui/button.tsx). Ad-hoc `<button>` elements with custom Tailwind classes are a non-goal — they bypass the hover/focus/disabled contract and the `active:translate-y-px` micro-press, and historically caused silent regressions (e.g. a sign-out button with no working hover because `bg-surface-subtle` wasn't a defined utility). Inline anchor-styled actions ("Enter manually", "Back to URL import") are the only exception and follow the link rules in Interactive States above.
+
+**Disabled state:** 50% opacity, `pointer-events-none`. Never use disabled buttons to hide unavailable actions — use a tooltip explaining why, or hide the button entirely.
 
 **Icon buttons:** Used for compact row actions only (`...` context menu, `×` close). Always carry a `Tooltip` and `aria-label`; never icon-only without accessible text.
 
@@ -1001,10 +1025,19 @@ Three-level hierarchy. At most one primary button visible per screen at any time
 
 **Inline validation** — form field errors only. Error message beneath the relevant field in `text-red-600 text-xs`. Focus returns to first error field. No modal for validation. No toast for validation.
 
-**Loading states:**
-- *Page load:* Skeleton rows (`animate-pulse`, slate-100 bg) while board fetches. Health score widget renders last.
-- *Scrape in progress:* Spinner + "Fetching listing details..." in import drawer. Fields hidden until resolved.
-- *Background recalculation:* Staleness banner only. No spinner on the main board.
+**Loading states — skeleton-first, never spinners:**
+
+The product never shows a spinner. Spinners signal "something is happening" without communicating *what* — they're disorienting on a content-dense board and break the calm-confidence promise. Every wait is represented by a skeleton in the shape of the content that's about to appear. Skeletons match the final layout (positions, heights, gutter sizes) so the page never visibly jumps when data arrives.
+
+- *Route navigation:* Each route under `(dashboard)` ships a `loading.tsx` that returns the page-shaped skeleton, served by Next.js while the Server Component resolves. Covered routes: `/board`, `/board/[listingId]`, `/settings`, `/onboarding`.
+- *Board (page load):* 6 skeleton rows at exactly `--board-row-height` (56px). Header row (title + action buttons) is itself skeleton-shaped so the layout doesn't shift when the real content swaps in.
+- *Listing detail (page load):* skeleton title + subtitle + badge placeholder + 4 metadata rows + accordion lines + archive button.
+- *Settings / Onboarding (page load):* skeleton heading + 4–5 labelled field-shaped rows + a button-shaped block.
+- *Scrape in progress (import drawer):* skeleton field group (label + input shapes, repeated) inside a subtle bordered card, replacing the previous spinner + "Fetching listing details…" text. Announced via `role="status"` / `aria-live="polite"`.
+- *Empty board:* same skeleton primitive at 30% opacity behind the empty-state CTA — keeps the visual weight of the board in place so first-listing-add doesn't feel like a layout pop.
+- *Background vitality recalculation:* staleness banner only. No skeleton on the main board.
+
+**Implementation:** [src/components/ui/skeleton.tsx](../../followcv/src/components/ui/skeleton.tsx) exposes `<Skeleton>` and `<SkeletonText>`. Single `skeleton-pulse` keyframe in [globals.css](../../followcv/src/app/globals.css) (1.4s opacity oscillation). All `loading.tsx` files compose these primitives — no per-route animation logic.
 
 ---
 
@@ -1021,7 +1054,7 @@ Three-level hierarchy. At most one primary button visible per screen at any time
 
 ### Navigation Patterns
 
-- **Primary navigation:** Left sidebar `NavLink` items. Active: `indigo-50` bg + `indigo-600` text. No sub-navigation.
+- **Primary navigation:** Left sidebar `NavLink` items ([src/components/shared/NavLink.tsx](../../followcv/src/components/shared/NavLink.tsx)). Idle: `text-secondary` on transparent. Hover: `bg-brand-subtle/60` + `text-brand`. Active (matched via `usePathname`, prefix match so `/board/[listingId]` keeps "Board" lit): `bg-brand-subtle` + `text-brand` + 2px left rail in `--brand`. `aria-current="page"` is set on the active link. No sub-navigation.
 - **In-page filtering:** `FilterChipBar` — not page navigation; filters in place without a URL change.
 - **Breadcrumbs:** Not used. Shallow hierarchy; active nav link provides sufficient orientation.
 - **Back navigation:** Every drawer and dialog has an explicit close/cancel control. No reliance on browser back button.
@@ -1054,6 +1087,29 @@ One full modal in the product — `ApplyRitualDialog`. All other overlapping UI 
 - **CV Versions — no uploads:** Inline prompt within the section. Not a full empty state.
 - **Loading board rows:** 3–5 skeleton rows matching real row height. Board doesn't jump on load.
 - **Loading health score:** Skeleton occupies widget area. Score never shows "0" or "—" during calculation.
+
+---
+
+### Motion System
+
+Motion is functional, not decorative. Every animation has a job: signal that something arrived (skeletons → content), confirm a transition between contexts (page transitions), or reinforce structure (drawer slides, board-row stagger). Nothing in this product spins or bounces for personality. All durations are tuned to feel direct on a fast machine without feeling abrupt.
+
+**Tokens (centralised in [globals.css](../../followcv/src/app/globals.css)):**
+
+| Animation | Duration | Easing | Trigger |
+|---|---|---|---|
+| `page-transition` | 180ms | `cubic-bezier(0.32, 0.72, 0, 1)` | Every route change inside `(dashboard)` |
+| `skeleton-pulse` | 1.4s loop | `ease-in-out` | While `loading.tsx` or in-component skeleton is mounted |
+| `slideInRow` (board row) | 240ms + 35ms stagger (capped at 8 rows) | `ease-out` | Initial board mount and board re-fetch |
+| Drawer slide (import) | 300ms in / 280ms out | `cubic-bezier(0.32, 0.72, 0, 1)` | Import drawer open/close |
+| Sidebar overlay (mobile) | 200ms | `ease-out` | Mobile hamburger open |
+| Hover transitions (buttons, links) | 150ms | `ease-out` | Hover/focus on interactive elements |
+
+**Page transitions:** Implemented via [src/app/(dashboard)/template.tsx](../../followcv/src/app/(dashboard)/template.tsx) — Next.js re-mounts a `template.tsx` on every navigation, so a single CSS class on the wrapper replays the `pageEnter` keyframe on each route change without per-page wiring. The animation is a 180ms fade-in with a 4px upward translate; short enough that it doesn't add to perceived navigation cost, long enough that it confirms "you arrived somewhere new." Unauthenticated routes (`/login`) sit outside this template by design — auth is a hard boundary, not a navigation.
+
+**Why no spinners anywhere:** Spinners say "wait" without saying "for what." A skeleton in the shape of the destination tells the user what's coming and lets the eye pre-place attention. On a board where the user's mental model is "ten listings I'm watching," seeing ten skeleton rows is more reassuring than a single rotating dot.
+
+**Reduced motion:** Every animation above has a `@media (prefers-reduced-motion: reduce)` fallback. Skeletons hold at 0.85 opacity, the page transition is removed entirely, and structural transitions (drawer, sidebar overlay) keep their state changes but drop their easing. The product remains fully usable with motion off.
 
 ---
 
@@ -1128,7 +1184,7 @@ Using Tailwind's default breakpoints:
 
 **Touch targets:** Minimum 44×44px for all interactive elements. Board row height (56px) satisfies this natively. Filter chips increase to `md:h-11` on tablet. VitalityBadge clickable area extends to 44px via transparent padding on tablet.
 
-**Reduced motion:** All `animate-pulse` and transition animations respect `@media (prefers-reduced-motion: reduce)`. Loading spinners replaced with static indicators.
+**Reduced motion:** All animations — `skeleton-pulse`, `page-transition`, board-row stagger, drawer slide, sidebar overlay — declare a `@media (prefers-reduced-motion: reduce)` fallback in [globals.css](../../followcv/src/app/globals.css). Skeletons stop pulsing (held at 0.85 opacity) and page transitions are removed entirely. The product has no spinners to disable.
 
 **High contrast:** CSS custom properties allow vitality state colour system to be overridden by Windows High Contrast mode. All icons are SVG with `currentColor` fill via Lucide React.
 

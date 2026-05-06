@@ -2,19 +2,21 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { UserMenu } from '@/components/shared/UserMenu'
 import { SidebarShell } from '@/components/shared/SidebarShell'
+import { Logo } from '@/components/shared/Logo'
+import { NavLink } from '@/components/shared/NavLink'
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
       <SidebarShell width="var(--sidebar-width)">
         {/* Brand */}
-        <div className="px-5 py-4">
+        <div className="px-5 py-5">
           <Link
             href="/"
-            className="text-base font-semibold tracking-tight"
-            style={{ color: 'var(--color-brand)' }}
+            aria-label="FollowCV home"
+            className="inline-flex rounded-md outline-none transition-opacity duration-150 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-brand/40"
           >
-            FollowCV
+            <Logo size="md" />
           </Link>
         </div>
 
@@ -23,20 +25,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-2 space-y-0.5" aria-label="Main navigation">
-          <Link
-            href="/board"
-            className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-slate-100"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            Board
-          </Link>
-          <Link
-            href="/settings"
-            className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-slate-100"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            Settings
-          </Link>
+          <NavLink href="/board">Board</NavLink>
+          <NavLink href="/settings">Settings</NavLink>
         </nav>
 
         {/* User menu */}

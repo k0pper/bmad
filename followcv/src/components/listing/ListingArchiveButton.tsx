@@ -3,6 +3,7 @@
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { archiveListing, unarchiveListing } from "@/actions/listing"
+import { Button } from "@/components/ui/button"
 
 type Props = {
   listingId: string
@@ -25,14 +26,14 @@ export function ListingArchiveButton({ listingId, archived }: Props) {
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="lg"
       onClick={handleClick}
       disabled={isPending}
-      className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-60"
-      style={{ borderColor: "var(--color-border, #e2e8f0)", color: "var(--color-text-primary)" }}
     >
       {isPending ? "Working…" : archived ? "Unarchive listing" : "Archive listing"}
-    </button>
+    </Button>
   )
 }

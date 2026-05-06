@@ -1,4 +1,5 @@
 import { auth, signOut } from "@/lib/auth"
+import { Button } from "@/components/ui/button"
 
 async function signOutAction() {
   "use server"
@@ -12,7 +13,7 @@ export async function UserMenu() {
   const { name, email } = session.user
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <div className="min-w-0">
         {name && (
           <p className="truncate text-sm font-medium text-text-primary">{name}</p>
@@ -23,12 +24,14 @@ export async function UserMenu() {
       </div>
 
       <form action={signOutAction}>
-        <button
+        <Button
           type="submit"
-          className="w-full rounded-md px-3 py-1.5 text-left text-sm text-text-secondary transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
         >
           Sign out
-        </button>
+        </Button>
       </form>
     </div>
   )

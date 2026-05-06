@@ -149,8 +149,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       {/* Back link */}
       <Link
         href="/board"
-        className="inline-flex items-center gap-1 text-sm"
-        style={{ color: "var(--color-text-secondary)" }}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1 -ml-2 text-sm text-text-secondary transition-colors duration-150 hover:bg-brand-subtle hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
       >
         ← Back to board
       </Link>

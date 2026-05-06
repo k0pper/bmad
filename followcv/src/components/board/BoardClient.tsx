@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { EmptyBoardState } from "./EmptyBoardState"
 import { ImportDrawer } from "./ImportDrawer"
+import { Button } from "@/components/ui/button"
 
 type Listing = {
   id: string
@@ -33,22 +34,22 @@ export function BoardClient({
         <h1 className="text-xl font-semibold" style={{ color: "var(--color-text-primary)" }}>
           {showArchived ? "Archived listings" : "Your Board"}
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Link
             href={showArchived ? "/board" : "/board?archived=true"}
-            className="text-sm underline"
-            style={{ color: "var(--color-text-secondary)" }}
+            className="rounded-md px-3 py-1.5 text-sm text-text-secondary transition-colors duration-150 hover:bg-brand-subtle/60 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             {showArchived ? "← Back to active" : "View archived"}
           </Link>
           {!showArchived && (
-            <button
+            <Button
               type="button"
+              variant="brand"
+              size="lg"
               onClick={() => setDrawerOpen(true)}
-              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90"
             >
               Add listing
-            </button>
+            </Button>
           )}
         </div>
       </div>

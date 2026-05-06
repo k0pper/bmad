@@ -1,4 +1,6 @@
 import { signIn } from "@/lib/auth"
+import { Logo } from "@/components/shared/Logo"
+import { Button } from "@/components/ui/button"
 
 async function signInWithGoogle() {
   "use server"
@@ -7,25 +9,25 @@ async function signInWithGoogle() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface-subtle">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-8 shadow-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">
-            FollowCV
-          </h1>
-          <p className="mt-2 text-sm text-text-secondary">
+    <main className="flex min-h-screen items-center justify-center bg-surface-subtle px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-8 shadow-sm">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Logo size="lg" />
+          <p className="mt-4 text-sm text-text-secondary">
             Sign in to track your job search
           </p>
         </div>
 
         <form action={signInWithGoogle}>
-          <button
+          <Button
             type="submit"
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary shadow-sm transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            variant="outline"
+            size="lg"
+            className="w-full gap-3 hover:shadow-sm"
           >
             <GoogleIcon />
             Sign in with Google
-          </button>
+          </Button>
         </form>
       </div>
     </main>
@@ -38,7 +40,7 @@ function GoogleIcon() {
       aria-hidden="true"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className="size-5"
     >
       <path
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"

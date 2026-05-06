@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { updateListing } from "@/actions/listing"
+import { Button } from "@/components/ui/button"
 
 type InitialValues = {
   title: string
@@ -107,13 +108,9 @@ export function ListingEditForm({ listingId, initialValues }: Props) {
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
-      >
+      <Button type="submit" variant="brand" size="lg" disabled={isPending}>
         {isPending ? "Saving…" : "Save changes"}
-      </button>
+      </Button>
     </form>
   )
 }

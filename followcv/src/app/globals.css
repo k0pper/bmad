@@ -247,6 +247,48 @@
   animation: fadeInOverlay 200ms ease-out both;
 }
 
+/* --- Loading skeleton --------------------------------------------- */
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+.skeleton-pulse {
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-pulse {
+    animation: none;
+    opacity: 0.85;
+  }
+}
+
+/* --- Page transitions --------------------------------------------- */
+/* 150ms fade + tiny rise — applied via template.tsx so it replays on
+   every route change. Disabled under prefers-reduced-motion. */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: pageEnter 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
+}
+
 @layer base {
   @font-face {
     font-family: 'Inter';
