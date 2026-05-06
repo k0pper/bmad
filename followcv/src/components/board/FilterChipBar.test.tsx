@@ -109,7 +109,7 @@ describe("FilterChipBar", () => {
       />
     )
     expect(
-      screen.queryByRole("button", { name: /clear filters/i })
+      screen.queryByRole("button", { name: /clear all filters/i })
     ).not.toBeInTheDocument()
     rerender(
       <FilterChipBar
@@ -125,7 +125,7 @@ describe("FilterChipBar", () => {
       />
     )
     expect(
-      screen.getByRole("button", { name: /clear filters/i })
+      screen.getByRole("button", { name: /clear all filters/i })
     ).toBeInTheDocument()
   })
 

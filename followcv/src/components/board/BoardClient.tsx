@@ -154,7 +154,7 @@ function FilterEmptyState({ onClearAll }: { onClearAll: () => void }) {
         No listings match these filters.
       </p>
       <Button type="button" variant="outline" size="sm" onClick={onClearAll}>
-        Clear filters
+        Clear all filters
       </Button>
     </div>
   )

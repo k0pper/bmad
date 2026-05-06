@@ -136,7 +136,7 @@ describe("BoardClient — filter pipeline integration", () => {
     // (FilterChipBar, only when isAnyFilterActive) and one inside the empty
     // state. Both are intentional.
     expect(
-      screen.getAllByRole("button", { name: /clear filters/i }).length
+      screen.getAllByRole("button", { name: /clear all filters/i }).length
     ).toBeGreaterThanOrEqual(1)
   })
 
@@ -151,10 +151,10 @@ describe("BoardClient — filter pipeline integration", () => {
     await user.click(screen.getByRole("button", { name: /Hot/ }))
     expect(screen.getAllByTestId("board-row")).toHaveLength(1)
 
-    // The "Clear filters" trailing button (sibling to the chips) shows up only
-    // once anything is active. There may also be one inside the empty state if
-    // no rows match — handle either by clicking the first match.
-    const clearButtons = screen.getAllByRole("button", { name: /^clear filters$/i })
+    // The "Clear all filters" trailing button (sibling to the sort/search row)
+    // shows up only once anything is active. There may also be one inside the
+    // empty state if no rows match — handle either by clicking the first match.
+    const clearButtons = screen.getAllByRole("button", { name: /clear all filters/i })
     await user.click(clearButtons[0])
 
     expect(screen.getAllByTestId("board-row")).toHaveLength(2)

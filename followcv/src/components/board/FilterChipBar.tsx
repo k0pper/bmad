@@ -50,7 +50,8 @@ export function FilterChipBar({
   const noStatesActive = selectedStates.length === 0
 
   return (
-    <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="mb-4 flex flex-col gap-3">
+      {/* Row 1 — vitality state chips */}
       <div
         role="group"
         aria-label="Filter by vitality state"
@@ -85,17 +86,27 @@ export function FilterChipBar({
         })}
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Row 2 — sort + search on the left, umbrella clear-all on the right */}
+      <div className="flex flex-wrap items-center gap-2">
         <SortMenu sort={sort} onSelect={onSetSort} />
         <SearchInput value={query} onChange={onSetQuery} />
+
         {isAnyFilterActive && (
-          <button
-            type="button"
-            onClick={onClearAll}
-            className="rounded-md px-2.5 py-1.5 text-xs text-text-secondary transition-colors duration-150 hover:bg-brand-subtle/60 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-          >
-            Clear filters
-          </button>
+          <>
+            {/* Visual separator to make it clear the umbrella action is
+                distinct from the sort/search controls beside it. */}
+            <span
+              aria-hidden="true"
+              className="ml-auto h-5 w-px bg-border"
+            />
+            <button
+              type="button"
+              onClick={onClearAll}
+              className="rounded-md px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors duration-150 hover:bg-brand-subtle hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              Clear all filters
+            </button>
+          </>
         )}
       </div>
     </div>
