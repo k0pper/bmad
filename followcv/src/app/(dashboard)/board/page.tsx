@@ -2,8 +2,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { getPreferenceProfile } from "@/lib/preferences/service"
 import { prisma } from "@/lib/db"
-import { BoardRow } from "@/components/board/BoardRow"
-import { BoardClient } from "@/components/board/BoardClient"
+import { BoardClient, type BoardListing } from "@/components/board/BoardClient"
 import { StalenessBanner } from "@/components/board/StalenessBanner"
 import type { OverrideSource, VitalityState, ImportSource } from "@/generated/prisma/client"
 
@@ -48,40 +47,37 @@ export default async function BoardPage({
     (l) => l.lastComputedAt !== null && nowMs - l.lastComputedAt.getTime() > TWO_HOURS_MS
   )
 
+  // Pre-compute the recency flag per listing on the server so the client
+  // doesn't need to re-derive it on every filter change. The math depends on
+  // `lastVisitAt`, which is only known to the server.
+  const boardListings: BoardListing[] = listings.map((listing) => ({
+    id: listing.id,
+    title: listing.title,
+    company: listing.company,
+    location: listing.location,
+    vitalityState: listing.vitalityState as VitalityState,
+    overrideSource: listing.overrideSource as OverrideSource | null,
+    importSource: listing.importSource as ImportSource,
+    postedAt: listing.postedAt,
+    createdAt: listing.createdAt,
+    salaryMin: listing.salaryMin,
+    salaryMax: listing.salaryMax,
+    salaryCurrency: listing.salaryCurrency,
+    archived: listing.archived,
+    notes: listing.notes,
+    closingDate: listing.closingDate,
+    isRecent:
+      !showArchived &&
+      listing.stateChangedAt !== null &&
+      previousVisitAt !== null &&
+      listing.stateChangedAt > previousVisitAt &&
+      nowMs - listing.stateChangedAt.getTime() < FORTY_EIGHT_HOURS_MS,
+  }))
+
   return (
     <div className="p-8">
       {hasStaleListings && <StalenessBanner />}
-      <BoardClient listings={listings} showArchived={showArchived}>
-        {listings.map((listing, index) => {
-          const isRecent =
-            !showArchived &&
-            listing.stateChangedAt !== null &&
-            previousVisitAt !== null &&
-            listing.stateChangedAt > previousVisitAt &&
-            nowMs - listing.stateChangedAt.getTime() < FORTY_EIGHT_HOURS_MS
-
-          return (
-            <BoardRow
-              key={listing.id}
-              id={listing.id}
-              title={listing.title}
-              company={listing.company}
-              location={listing.location}
-              vitalityState={listing.vitalityState as VitalityState}
-              overrideSource={listing.overrideSource as OverrideSource | null}
-              importSource={listing.importSource as ImportSource}
-              postedAt={listing.postedAt}
-              createdAt={listing.createdAt}
-              salaryMin={listing.salaryMin}
-              salaryMax={listing.salaryMax}
-              salaryCurrency={listing.salaryCurrency}
-              archived={listing.archived}
-              isRecent={isRecent}
-              rowIndex={index}
-            />
-          )
-        })}
-      </BoardClient>
+      <BoardClient listings={boardListings} showArchived={showArchived} />
     </div>
   )
 }

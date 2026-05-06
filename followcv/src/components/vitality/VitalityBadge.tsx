@@ -9,7 +9,7 @@ type BadgeConfig = {
   ariaContext: string
 }
 
-const CONFIG: Record<VitalityState, BadgeConfig> = {
+export const VITALITY_BADGE_CONFIG: Record<VitalityState, BadgeConfig> = {
   HOT: {
     label: "Hot",
     bg: "var(--color-vitality-hot-bg)",
@@ -75,7 +75,7 @@ export function VitalityBadge({
   state: VitalityState
   isOverridden?: boolean
 }) {
-  const { label, bg, text, icon: Icon, ariaContext } = CONFIG[state]
+  const { label, bg, text, icon: Icon, ariaContext } = VITALITY_BADGE_CONFIG[state]
 
   return (
     <span

@@ -1,37 +1,73 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { EmptyBoardState } from "./EmptyBoardState"
 import { ImportDrawer } from "./ImportDrawer"
+import { BoardRow } from "./BoardRow"
+import { FilterChipBar } from "./FilterChipBar"
 import { Button } from "@/components/ui/button"
+import {
+  applyBoardFilters,
+  countByVitalityState,
+  DEFAULT_FILTER_STATE,
+} from "./applyBoardFilters"
+import { useBoardFilters } from "./useBoardFilters"
+import type {
+  ImportSource,
+  OverrideSource,
+  VitalityState,
+} from "@/generated/prisma/client"
 
-type Listing = {
+export type BoardListing = {
   id: string
   title: string
   company: string
   location: string | null
-  vitalityState: string
-  importSource: string
+  vitalityState: VitalityState
+  overrideSource: OverrideSource | null
+  importSource: ImportSource
   postedAt: Date | null
   createdAt: Date
+  salaryMin: number | null
+  salaryMax: number | null
+  salaryCurrency: string | null
+  archived: boolean
+  notes: string | null
+  closingDate: Date | null
+  isRecent: boolean
 }
 
 export function BoardClient({
   listings,
   showArchived = false,
-  children,
 }: {
-  listings: Listing[]
+  listings: BoardListing[]
   showArchived?: boolean
-  children?: React.ReactNode
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const filters = useBoardFilters()
+
+  const counts = useMemo(() => countByVitalityState(listings), [listings])
+  const filtered = useMemo(
+    () => applyBoardFilters(listings, filters.state),
+    [listings, filters.state]
+  )
+
+  const isAnyFilterActive =
+    filters.state.selectedStates.length > 0 ||
+    filters.state.query.trim().length > 0 ||
+    filters.state.sort !== DEFAULT_FILTER_STATE.sort
+
+  const hasListings = listings.length > 0
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold" style={{ color: "var(--color-text-primary)" }}>
+      <div className="mb-6 flex items-center justify-between">
+        <h1
+          className="text-xl font-semibold"
+          style={{ color: "var(--color-text-primary)" }}
+        >
           {showArchived ? "Archived listings" : "Your Board"}
         </h1>
         <div className="flex items-center gap-2">
@@ -54,7 +90,21 @@ export function BoardClient({
         </div>
       </div>
 
-      {listings.length === 0 ? (
+      {hasListings && (
+        <FilterChipBar
+          selectedStates={filters.state.selectedStates}
+          counts={counts}
+          query={filters.state.query}
+          sort={filters.state.sort}
+          isAnyFilterActive={isAnyFilterActive}
+          onToggleState={filters.toggleState}
+          onClearAll={filters.clearAll}
+          onSetQuery={filters.setQuery}
+          onSetSort={filters.setSort}
+        />
+      )}
+
+      {!hasListings ? (
         showArchived ? (
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             No archived listings.
@@ -62,13 +112,50 @@ export function BoardClient({
         ) : (
           <EmptyBoardState onAddListing={() => setDrawerOpen(true)} />
         )
+      ) : filtered.length === 0 ? (
+        <FilterEmptyState onClearAll={filters.clearAll} />
       ) : (
         <div className="rounded-md border">
-          {children}
+          {filtered.map((listing, index) => (
+            <BoardRow
+              key={listing.id}
+              id={listing.id}
+              title={listing.title}
+              company={listing.company}
+              location={listing.location}
+              vitalityState={listing.vitalityState}
+              overrideSource={listing.overrideSource}
+              importSource={listing.importSource}
+              postedAt={listing.postedAt}
+              createdAt={listing.createdAt}
+              salaryMin={listing.salaryMin}
+              salaryMax={listing.salaryMax}
+              salaryCurrency={listing.salaryCurrency}
+              archived={listing.archived}
+              isRecent={listing.isRecent}
+              rowIndex={index}
+            />
+          ))}
         </div>
       )}
 
       <ImportDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
     </>
+  )
+}
+
+function FilterEmptyState({ onClearAll }: { onClearAll: () => void }) {
+  return (
+    <div
+      role="status"
+      className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border py-12 text-center"
+    >
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        No listings match these filters.
+      </p>
+      <Button type="button" variant="outline" size="sm" onClick={onClearAll}>
+        Clear filters
+      </Button>
+    </div>
   )
 }

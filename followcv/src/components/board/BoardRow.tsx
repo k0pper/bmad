@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { VitalityOverrideMenu } from "@/components/board/VitalityOverrideMenu"
 import { BoardRowOverflowMenu } from "@/components/board/BoardRowOverflowMenu"
