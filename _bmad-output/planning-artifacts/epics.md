@@ -451,10 +451,12 @@ So that I can see all fields, notes, application history, and CV snapshot in one
 
 **Given** a user clicks a `BoardRow` on `/board`,
 **When** the listing detail page loads at `/board/[listingId]`,
-**Then** all `JobListing` fields are rendered: title, company, location, salary range (formatted as "$80k–$120k" when available), posting date, date added, source URL, notes, and current vitality state
-**And** a "How this state was determined" section is shown beneath the vitality badge — it renders each of the 11 state machine rules with a pass/skip/fail indicator and a plain-English explanation of the inputs that were evaluated (e.g. "Posted 3 days ago — within 7-day window → HOT ✓"); the firing rule is visually highlighted
-**And** if an `Application` record exists for the listing, the application detail section is shown: status, applied date, applied CV version name, and "View CV sent" button
-**And** if no application exists, a "Record application" CTA is shown (same flow as Story 3.3)
+**Then** the "always visible" core info block shows: title, company, location, salary range (formatted as "$80k–$120k"), posting date, date added, source URL (clickable), and the `VitalityBadge`
+**And** below the core info, an accordion (`DetailAccordion`) holds all secondary sections so the view is never overwhelming; sections can be independently expanded or collapsed; the "Why this state?" section is open by default
+**And** the "Why this state?" accordion section uses `VitalityExplanation`: skipped rules are hidden entirely; only evaluated rules are shown — "passed" prerequisites rendered as a compact checklist above a visual connector, and the single decisive ("fired") rule rendered as a highlighted conclusion card alongside the `VitalityBadge`; the component lives in `src/components/listing/VitalityExplanation.tsx`
+**And** the "Notes" accordion section is shown only when `listing.notes` is non-null
+**And** the "Application" accordion section shows application status and applied date when an `Application` record exists; otherwise shows "No application recorded yet" with a future CTA placeholder
+**And** additional accordion sections for CV snapshot, timeline, and edit actions can be added in future stories without layout changes
 **And** a back link returns the user to `/board`
 **And** the page is accessible: all interactive elements reachable by keyboard, heading hierarchy correct, ARIA labels on action buttons
 
