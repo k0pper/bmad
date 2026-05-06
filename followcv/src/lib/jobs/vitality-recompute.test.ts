@@ -147,6 +147,35 @@ describe("handleVitalityRecompute", () => {
     )
   })
 
+  it("preserves USER override across recompute (state machine returns the override state)", async () => {
+    // The state machine's Rule 3 returns overrideState when overrideSource === "USER".
+    // Recompute must pass both fields to the state machine and persist the result.
+    mockPrisma.jobListing.findMany.mockResolvedValue([
+      {
+        ...makeListing({ vitalityState: "IN_DIALOGUE" }),
+        overrideState: "IN_DIALOGUE",
+        overrideSource: "USER",
+      },
+    ])
+    mockCompute.mockReturnValue("IN_DIALOGUE")
+
+    const result = await handleVitalityRecompute()
+
+    expect(mockCompute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        overrideState: "IN_DIALOGUE",
+        overrideSource: "USER",
+      })
+    )
+    // State unchanged (override preserved) so no audit log entry.
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled()
+    expect(result.changed).toBe(0)
+
+    const updateData = mockPrisma.jobListing.update.mock.calls[0][0].data
+    expect(updateData.vitalityState).toBe("IN_DIALOGUE")
+    expect(updateData.stateChangedAt).toBeUndefined()
+  })
+
   it("processes multiple listings and reports correct counts", async () => {
     mockPrisma.jobListing.findMany.mockResolvedValue([
       makeListing({ id: "l1", vitalityState: "HOT" }),

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { EmptyBoardState } from "./EmptyBoardState"
 import { ImportDrawer } from "./ImportDrawer"
 
@@ -15,26 +16,51 @@ type Listing = {
   createdAt: Date
 }
 
-export function BoardClient({ listings, children }: { listings: Listing[]; children?: React.ReactNode }) {
+export function BoardClient({
+  listings,
+  showArchived = false,
+  children,
+}: {
+  listings: Listing[]
+  showArchived?: boolean
+  children?: React.ReactNode
+}) {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   return (
     <>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold" style={{ color: "var(--color-text-primary)" }}>
-          Your Board
+          {showArchived ? "Archived listings" : "Your Board"}
         </h1>
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          Add listing
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href={showArchived ? "/board" : "/board?archived=true"}
+            className="text-sm underline"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            {showArchived ? "← Back to active" : "View archived"}
+          </Link>
+          {!showArchived && (
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              Add listing
+            </button>
+          )}
+        </div>
       </div>
 
       {listings.length === 0 ? (
-        <EmptyBoardState onAddListing={() => setDrawerOpen(true)} />
+        showArchived ? (
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            No archived listings.
+          </p>
+        ) : (
+          <EmptyBoardState onAddListing={() => setDrawerOpen(true)} />
+        )
       ) : (
         <div className="rounded-md border">
           {children}

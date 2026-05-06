@@ -1,4 +1,4 @@
-import { Flame, Clock, CircleCheck, MessageCircle, Thermometer, Snowflake, Ghost, XCircle } from "lucide-react"
+import { Flame, Clock, CircleCheck, MessageCircle, Thermometer, Snowflake, Ghost, XCircle, Lock } from "lucide-react"
 import type { VitalityState } from "@/generated/prisma/client"
 
 type BadgeConfig = {
@@ -68,17 +68,24 @@ const CONFIG: Record<VitalityState, BadgeConfig> = {
   },
 }
 
-export function VitalityBadge({ state }: { state: VitalityState }) {
+export function VitalityBadge({
+  state,
+  isOverridden = false,
+}: {
+  state: VitalityState
+  isOverridden?: boolean
+}) {
   const { label, bg, text, icon: Icon, ariaContext } = CONFIG[state]
 
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
       style={{ backgroundColor: bg, color: text }}
-      aria-label={`${label} — ${ariaContext}`}
+      aria-label={`${label} — ${ariaContext}${isOverridden ? " (manually overridden)" : ""}`}
     >
       <Icon size={12} aria-hidden />
       {label}
+      {isOverridden && <Lock size={10} aria-hidden />}
     </span>
   )
 }

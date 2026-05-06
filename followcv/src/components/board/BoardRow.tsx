@@ -1,6 +1,7 @@
 import Link from "next/link"
-import { VitalityBadge } from "@/components/vitality/VitalityBadge"
-import type { VitalityState } from "@/generated/prisma/client"
+import { VitalityOverrideMenu } from "@/components/board/VitalityOverrideMenu"
+import { BoardRowOverflowMenu } from "@/components/board/BoardRowOverflowMenu"
+import type { OverrideSource, VitalityState } from "@/generated/prisma/client"
 
 type BoardRowProps = {
   id: string
@@ -8,12 +9,14 @@ type BoardRowProps = {
   company: string
   location: string | null
   vitalityState: VitalityState
+  overrideSource: OverrideSource | null
   importSource: "URL_IMPORT" | "MANUAL"
   postedAt: Date | string | null
   createdAt: Date | string
   salaryMin: number | null
   salaryMax: number | null
   salaryCurrency: string | null
+  archived?: boolean
   isRecent?: boolean
   rowIndex?: number
 }
@@ -43,12 +46,14 @@ export function BoardRow({
   company,
   location,
   vitalityState,
+  overrideSource,
   importSource,
   postedAt,
   createdAt,
   salaryMin,
   salaryMax,
   salaryCurrency,
+  archived = false,
   isRecent = false,
   rowIndex = 0,
 }: BoardRowProps) {
@@ -96,9 +101,13 @@ export function BoardRow({
         </p>
       </div>
 
-      {/* VitalityBadge */}
+      {/* VitalityBadge with override menu */}
       <div className="flex-shrink-0">
-        <VitalityBadge state={vitalityState} />
+        <VitalityOverrideMenu
+          listingId={id}
+          currentState={vitalityState}
+          overrideSource={overrideSource}
+        />
       </div>
 
       {/* Date added */}
@@ -116,6 +125,9 @@ export function BoardRow({
         title={importSource === "URL_IMPORT" ? "Auto-imported from URL" : "Manually added"}
         aria-hidden="true"
       />
+
+      {/* Overflow menu (Archive / Unarchive) */}
+      <BoardRowOverflowMenu listingId={id} archived={archived} />
     </Link>
   )
 }

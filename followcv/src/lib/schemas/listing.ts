@@ -17,3 +17,43 @@ export const manualImportSchema = z.object({
 })
 
 export type ManualImportInput = z.infer<typeof manualImportSchema>
+
+const optionalString = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v === "" || v === undefined ? null : v))
+
+const optionalPositiveInt = z
+  .union([z.coerce.number().int().positive(), z.literal("")])
+  .optional()
+  .transform((v) => (v === "" || v === undefined ? null : v))
+
+const optionalDate = z
+  .union([z.coerce.date(), z.literal("")])
+  .optional()
+  .transform((v) => (v === "" || v === undefined ? null : (v as Date)))
+
+export const updateListingSchema = z
+  .object({
+    title: z.string().min(1, "Title is required").max(200),
+    company: z.string().min(1, "Company is required").max(200),
+    location: optionalString(200),
+    salaryMin: optionalPositiveInt,
+    salaryMax: optionalPositiveInt,
+    salaryCurrency: z
+      .string()
+      .length(3)
+      .optional()
+      .transform((v) => (v === undefined || v === "" ? "USD" : v)),
+    notes: optionalString(5000),
+    closingDate: optionalDate,
+  })
+  .refine(
+    (d) => d.salaryMin === null || d.salaryMax === null || d.salaryMax >= d.salaryMin,
+    { message: "Maximum salary must be greater than or equal to minimum", path: ["salaryMax"] }
+  )
+
+export type UpdateListingInput = z.infer<typeof updateListingSchema>

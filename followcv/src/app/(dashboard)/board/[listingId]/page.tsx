@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db"
 import { VitalityBadge } from "@/components/vitality/VitalityBadge"
 import { DetailAccordion } from "@/components/listing/DetailAccordion"
 import { VitalityExplanation } from "@/components/listing/VitalityExplanation"
+import { ListingEditForm } from "@/components/listing/ListingEditForm"
+import { ListingArchiveButton } from "@/components/listing/ListingArchiveButton"
 import { explainVitalityState, computeVitalityState } from "@/lib/services/vitality-state-machine"
 import type { VitalityState, ApplicationStatus } from "@/generated/prisma/client"
 
@@ -121,6 +123,25 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
         </p>
       ),
     },
+    {
+      id: "edit",
+      label: "Edit",
+      children: (
+        <ListingEditForm
+          listingId={listing.id}
+          initialValues={{
+            title: listing.title,
+            company: listing.company,
+            location: listing.location,
+            salaryMin: listing.salaryMin,
+            salaryMax: listing.salaryMax,
+            salaryCurrency: listing.salaryCurrency,
+            notes: listing.notes,
+            closingDate: listing.closingDate,
+          }}
+        />
+      ),
+    },
   ]
 
   return (
@@ -148,7 +169,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             </p>
           </div>
           <div className="flex-shrink-0 mt-0.5">
-            <VitalityBadge state={displayState} />
+            <VitalityBadge state={displayState} isOverridden={listing.overrideSource === "USER"} />
           </div>
         </div>
 
@@ -196,6 +217,10 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       {/* Expandable sections */}
       <div className="border-t" style={{ borderColor: "var(--color-border, #e2e8f0)" }}>
         <DetailAccordion sections={accordionSections} defaultOpen={["vitality"]} />
+      </div>
+
+      <div className="pt-4">
+        <ListingArchiveButton listingId={listing.id} archived={listing.archived} />
       </div>
     </div>
   )
