@@ -1,3 +1,4 @@
+// board page
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { getPreferenceProfile } from "@/lib/preferences/service"
