@@ -13,6 +13,12 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    // NOTE: we deliberately do NOT pass `onUploadCompleted`. Providing it (even
+    // as a no-op) causes the Vercel Blob SDK to attempt a webhook handshake
+    // back to the app after the PUT completes — which hangs forever in local
+    // dev because there's no reachable callbackUrl. The DB row is created by
+    // the `confirmCvUpload` Server Action, which the client calls immediately
+    // after `upload()` resolves.
     const json = await handleUpload({
       body,
       request,
@@ -52,12 +58,6 @@ export async function POST(request: Request): Promise<Response> {
             fileHash,
           }),
         }
-      },
-      onUploadCompleted: async () => {
-        // No-op. The CvVersion DB row is created by `confirmCvUpload`
-        // (Server Action) called from the client immediately after upload
-        // returns. The webhook is unreliable in local dev without a public
-        // tunnel, so we don't depend on it.
       },
     })
     return Response.json(json)
