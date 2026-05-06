@@ -1,6 +1,7 @@
 import { get } from "@vercel/blob"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { buildContentDisposition } from "@/lib/http/contentDisposition"
 
 /**
  * Same-origin proxy that streams a CV file from Vercel Blob to the browser.
@@ -51,16 +52,17 @@ export async function GET(
       "Content-Type": "application/pdf",
       // Hint the browser to render inline (the preview renders to a canvas;
       // for downloads, the dedicated requestCvDownloadUrl flow is used).
-      "Content-Disposition": `inline; filename="${escapeFilename(cv.name)}.pdf"`,
+      // RFC 6266-compliant encoding handles non-ASCII names like the default
+      // `CV — 2026-05-06` (em-dash is U+2014, > 255 byte) without crashing
+      // the Response constructor.
+      "Content-Disposition": buildContentDisposition(
+        "inline",
+        `${cv.name}.pdf`
+      ),
       // Five-minute private cache so refreshing /cv doesn't re-stream every
       // PDF. Cache-Control: private prevents shared/CDN caches from holding
       // a copy keyed only by URL, which would be a privacy issue.
       "Cache-Control": "private, max-age=300",
     },
   })
-}
-
-function escapeFilename(name: string): string {
-  // Strip characters that break Content-Disposition headers.
-  return name.replace(/[\r\n"\\]/g, "_")
 }
