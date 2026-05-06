@@ -34,9 +34,9 @@ export default async function BoardPage() {
   // Fire-and-forget: update lastVisitAt without blocking the render
   prisma.user.update({ where: { id: session.user.id }, data: { lastVisitAt: new Date() } }).catch(() => {})
 
-  const now = Date.now()
+  const nowMs = new Date().getTime()
   const hasStaleListings = listings.some(
-    (l) => l.lastComputedAt !== null && now - l.lastComputedAt.getTime() > TWO_HOURS_MS
+    (l) => l.lastComputedAt !== null && nowMs - l.lastComputedAt.getTime() > TWO_HOURS_MS
   )
 
   return (
@@ -48,7 +48,7 @@ export default async function BoardPage() {
             listing.stateChangedAt !== null &&
             previousVisitAt !== null &&
             listing.stateChangedAt > previousVisitAt &&
-            now - listing.stateChangedAt.getTime() < FORTY_EIGHT_HOURS_MS
+            nowMs - listing.stateChangedAt.getTime() < FORTY_EIGHT_HOURS_MS
 
           return (
             <BoardRow
