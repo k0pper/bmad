@@ -11,7 +11,6 @@ vi.mock("@/lib/db", () => ({
     jobListing: {
       findFirst: vi.fn(),
       update: vi.fn(),
-      updateMany: vi.fn(),
     },
     auditLog: {
       create: vi.fn(),
@@ -42,7 +41,6 @@ type MockPrisma = {
   jobListing: {
     findFirst: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
-    updateMany: ReturnType<typeof vi.fn>
   }
   auditLog: {
     create: ReturnType<typeof vi.fn>
@@ -250,35 +248,40 @@ describe("undoVitalityOverride", () => {
 })
 
 describe("archiveListing / unarchiveListing", () => {
-  it("archives a listing scoped to the current user", async () => {
+  it("archives a listing after verifying ownership", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockPrisma.jobListing.updateMany.mockResolvedValue({ count: 1 })
+    mockPrisma.jobListing.findFirst.mockResolvedValue({ id: "listing-1" })
 
     const result = await archiveListing("listing-1")
 
     expect(result.error).toBeNull()
-    expect(mockPrisma.jobListing.updateMany).toHaveBeenCalledWith({
+    expect(mockPrisma.jobListing.findFirst).toHaveBeenCalledWith({
       where: { id: "listing-1", userId: "user-1", deletedAt: null },
+      select: { id: true },
+    })
+    expect(mockPrisma.jobListing.update).toHaveBeenCalledWith({
+      where: { id: "listing-1" },
       data: { archived: true },
     })
   })
 
   it("returns an error when the listing is not found", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockPrisma.jobListing.updateMany.mockResolvedValue({ count: 0 })
+    mockPrisma.jobListing.findFirst.mockResolvedValue(null)
 
     const result = await archiveListing("listing-1")
     expect(result).toEqual({ data: null, error: "Listing not found" })
+    expect(mockPrisma.jobListing.update).not.toHaveBeenCalled()
   })
 
   it("unarchives a listing", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockPrisma.jobListing.updateMany.mockResolvedValue({ count: 1 })
+    mockPrisma.jobListing.findFirst.mockResolvedValue({ id: "listing-1" })
 
     const result = await unarchiveListing("listing-1")
     expect(result.error).toBeNull()
-    expect(mockPrisma.jobListing.updateMany).toHaveBeenCalledWith({
-      where: { id: "listing-1", userId: "user-1", deletedAt: null },
+    expect(mockPrisma.jobListing.update).toHaveBeenCalledWith({
+      where: { id: "listing-1" },
       data: { archived: false },
     })
   })
@@ -295,7 +298,7 @@ describe("updateListing", () => {
     mockAuth.mockResolvedValue(validSession)
     const result = await updateListing("listing-1", makeFormData({ title: "", company: "Acme" }))
     expect(result.error).not.toBeNull()
-    expect(mockPrisma.jobListing.updateMany).not.toHaveBeenCalled()
+    expect(mockPrisma.jobListing.update).not.toHaveBeenCalled()
   })
 
   it("rejects salaryMax less than salaryMin", async () => {
@@ -312,9 +315,9 @@ describe("updateListing", () => {
     expect(result.error).not.toBeNull()
   })
 
-  it("writes parsed fields scoped to the user", async () => {
+  it("writes parsed fields after verifying ownership", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockPrisma.jobListing.updateMany.mockResolvedValue({ count: 1 })
+    mockPrisma.jobListing.findFirst.mockResolvedValue({ id: "listing-1" })
 
     const result = await updateListing(
       "listing-1",
@@ -330,8 +333,12 @@ describe("updateListing", () => {
     )
 
     expect(result.error).toBeNull()
-    const call = mockPrisma.jobListing.updateMany.mock.calls[0][0]
-    expect(call.where).toEqual({ id: "listing-1", userId: "user-1", deletedAt: null })
+    expect(mockPrisma.jobListing.findFirst).toHaveBeenCalledWith({
+      where: { id: "listing-1", userId: "user-1", deletedAt: null },
+      select: { id: true },
+    })
+    const call = mockPrisma.jobListing.update.mock.calls[0][0]
+    expect(call.where).toEqual({ id: "listing-1" })
     expect(call.data).toMatchObject({
       title: "Staff Engineer",
       company: "Acme",
@@ -345,11 +352,12 @@ describe("updateListing", () => {
 
   it("returns an error when no listing matches the user", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockPrisma.jobListing.updateMany.mockResolvedValue({ count: 0 })
+    mockPrisma.jobListing.findFirst.mockResolvedValue(null)
     const result = await updateListing(
       "listing-1",
       makeFormData({ title: "Staff Engineer", company: "Acme" })
     )
     expect(result).toEqual({ data: null, error: "Listing not found" })
+    expect(mockPrisma.jobListing.update).not.toHaveBeenCalled()
   })
 })

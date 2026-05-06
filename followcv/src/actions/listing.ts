@@ -193,18 +193,30 @@ export async function undoVitalityOverride(
   return { data: { ok: true }, error: null }
 }
 
+async function findOwnedListingId(
+  listingId: string,
+  userId: string
+): Promise<string | null> {
+  const listing = await prisma.jobListing.findFirst({
+    where: { id: listingId, userId, deletedAt: null },
+    select: { id: true },
+  })
+  return listing?.id ?? null
+}
+
 export async function archiveListing(
   listingId: string
 ): Promise<ActionResult<{ ok: true }>> {
   const session = await requireUser()
   if (!session.ok) return { data: null, error: session.error }
 
-  const result = await prisma.jobListing.updateMany({
-    where: { id: listingId, userId: session.userId, deletedAt: null },
+  const ownedId = await findOwnedListingId(listingId, session.userId)
+  if (!ownedId) return { data: null, error: "Listing not found" }
+
+  await prisma.jobListing.update({
+    where: { id: ownedId },
     data: { archived: true },
   })
-  if (result.count === 0) return { data: null, error: "Listing not found" }
-
   return { data: { ok: true }, error: null }
 }
 
@@ -214,12 +226,13 @@ export async function unarchiveListing(
   const session = await requireUser()
   if (!session.ok) return { data: null, error: session.error }
 
-  const result = await prisma.jobListing.updateMany({
-    where: { id: listingId, userId: session.userId, deletedAt: null },
+  const ownedId = await findOwnedListingId(listingId, session.userId)
+  if (!ownedId) return { data: null, error: "Listing not found" }
+
+  await prisma.jobListing.update({
+    where: { id: ownedId },
     data: { archived: false },
   })
-  if (result.count === 0) return { data: null, error: "Listing not found" }
-
   return { data: { ok: true }, error: null }
 }
 
@@ -244,8 +257,11 @@ export async function updateListing(
     return { data: null, error: parsed.error.issues?.[0]?.message ?? "Invalid input" }
   }
 
-  const result = await prisma.jobListing.updateMany({
-    where: { id: listingId, userId: session.userId, deletedAt: null },
+  const ownedId = await findOwnedListingId(listingId, session.userId)
+  if (!ownedId) return { data: null, error: "Listing not found" }
+
+  await prisma.jobListing.update({
+    where: { id: ownedId },
     data: {
       title: parsed.data.title,
       company: parsed.data.company,
@@ -257,7 +273,5 @@ export async function updateListing(
       closingDate: parsed.data.closingDate,
     },
   })
-  if (result.count === 0) return { data: null, error: "Listing not found" }
-
   return { data: { id: listingId }, error: null }
 }
