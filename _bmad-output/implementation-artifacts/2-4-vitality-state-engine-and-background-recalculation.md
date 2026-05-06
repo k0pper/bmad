@@ -43,7 +43,7 @@ So that I always know which listings need attention when I return.
   - [x] Return JSON summary; stop boss before returning (finally block)
 
 - [x] Task 5 — Vercel Cron config: `vercel.json` (AC: 3)
-  - [x] Create `vercel.json` with cron calling `/api/jobs/process` at `0 * * * *` (hourly)
+  - [x] Create `vercel.json` with cron calling `/api/jobs/process` at `0 0 * * *` (daily)
 
 - [x] Task 6 — Tests: `src/lib/jobs/vitality-recompute.test.ts` (AC: 1, 5)
   - [x] Mock Prisma; test that changed states are updated with `stateChangedAt`

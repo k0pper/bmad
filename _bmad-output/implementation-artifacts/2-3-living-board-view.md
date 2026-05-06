@@ -53,7 +53,7 @@ So that I can scan my entire job search pipeline at a glance.
 ### StalenessBanner
 - Show only when `lastComputedAt !== null && lastComputedAt < now - 2h`
 - When all listings have `lastComputedAt = null` (story 2.4 not yet run), banner is NOT shown
-- Simple informational banner: "Vitality states may be outdated — recalculation runs hourly"
+- Simple informational banner: "Vitality states may be outdated — recalculation runs daily"
 
 ### Recency indicator
 - In board page: read `User.lastVisitAt` BEFORE updating it (use old value for indicator logic)

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { CvUploadDialog } from "./CvUploadDialog"
 import { CvPreview } from "./CvPreview"
 import { formatFileSize } from "./formatFileSize"
-import { requestCvDownloadUrl } from "@/actions/manage-cv"
 
 type CvVersionRow = {
   id: string
@@ -28,20 +27,6 @@ type Props = {
 
 export function CvVersionsClient({ versions, cap }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
-  const [downloadError, setDownloadError] = useState<string | null>(null)
-
-  async function handleDownload(cvVersionId: string) {
-    setDownloadingId(cvVersionId)
-    setDownloadError(null)
-    const r = await requestCvDownloadUrl(cvVersionId)
-    setDownloadingId(null)
-    if (r.error || !r.data) {
-      setDownloadError(r.error ?? "Could not open file")
-      return
-    }
-    window.open(r.data.url, "_blank", "noopener,noreferrer")
-  }
 
   return (
     <>
@@ -76,28 +61,12 @@ export function CvVersionsClient({ versions, cap }: Props) {
         </Button>
       </div>
 
-      {downloadError && (
-        <p
-          role="alert"
-          className="mb-4 text-sm"
-          style={{ color: "var(--color-danger)" }}
-        >
-          {downloadError}
-        </p>
-      )}
-
       {versions.length === 0 ? (
         <EmptyState onUpload={() => setDialogOpen(true)} />
       ) : (
         <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {versions.map((cv, index) => (
-            <CvCard
-              key={cv.id}
-              cv={cv}
-              isActive={index === 0}
-              isDownloading={downloadingId === cv.id}
-              onDownload={() => handleDownload(cv.id)}
-            />
+            <CvCard key={cv.id} cv={cv} isActive={index === 0} />
           ))}
         </ul>
       )}
@@ -110,13 +79,9 @@ export function CvVersionsClient({ versions, cap }: Props) {
 function CvCard({
   cv,
   isActive,
-  isDownloading,
-  onDownload,
 }: {
   cv: CvVersionRow
   isActive: boolean
-  isDownloading: boolean
-  onDownload: () => void
 }) {
   const dateLabel = new Date(cv.uploadedAt).toLocaleDateString("en-US", {
     year: "numeric",
@@ -154,17 +119,22 @@ function CvCard({
             {dateLabel} · {formatFileSize(cv.fileSize)}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={isDownloading}
-          onClick={onDownload}
+        {/*
+         * Plain anchor — the proxy returns Content-Disposition: attachment
+         * when ?download=1 is set, so the browser saves the file. Using <a>
+         * instead of a button gives free right-click "Save as", middle-click
+         * new tab, and Cmd-click — all natural download UX.
+         */}
+        <a
+          href={`/api/cv/${cv.id}/file?download=1`}
+          target="_blank"
+          rel="noopener noreferrer"
           aria-label={`Download ${cv.name}`}
+          className="inline-flex h-7 items-center gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] font-medium text-text-secondary transition-colors duration-150 hover:bg-brand-subtle hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <Download size={14} aria-hidden />
-          {isDownloading ? "Opening…" : "Download"}
-        </Button>
+          Download
+        </a>
       </div>
     </li>
   )

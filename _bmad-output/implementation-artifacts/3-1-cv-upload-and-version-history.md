@@ -18,9 +18,9 @@ So that I have a versioned history of my CVs to choose from when applying.
    - The token route does `auth()` + cap check inside `onBeforeGenerateToken` and returns a token allowing only `application/pdf`, max 10 MB. **It does not write to the DB.**
    - On successful PUT, the client receives `{ url, contentDisposition, ... }` from Vercel Blob.
    - The client then calls a `confirmCvUpload({ blobUrl, name, fileSize, fileHash })` Server Action which auth-checks, re-derives ownership, and creates the `CvVersion` row with `s3Key = blobUrl`, `fileSize`, `fileHash`.
-5. CV files are served via Server-Action-generated download URLs (`requestCvDownloadUrl`). The Vercel Blob store is **private**, so blob URLs carry a short-lived signature minted by the SDK using the server-side `BLOB_READ_WRITE_TOKEN`. The Server Action calls `head(cvVersion.s3Key)` from `@vercel/blob` on every request to mint a fresh signed URL — **the URL stored at upload time eventually expires and must not be served back directly**. The application enforces auth before minting: `findFirst` scoped to the caller's `userId`, return `Not found` for non-owners. The same fresh-URL flow powers the card-grid PDF previews (server pre-mints them in the page Server Component to avoid a fan-out of client-side action calls on first paint).
+5. CV files are served exclusively via a same-origin proxy route at `/api/cv/[id]/file`, used for both the page-1 preview and the Download button. The Vercel Blob store is **private**, and Vercel Blob v2 does not expose a way to mint a browser-usable signed download URL — direct browser navigation to a private blob URL returns 403. The proxy auth-checks (`auth()`), ownership-checks (`findFirst` scoped to the caller's `userId`, returning 404 for non-owners so other users' CV existence isn't leaked), and streams the bytes via `get(s3Key, { access: 'private' })`. The blob URL never leaves the server. A `?download=1` query param flips the `Content-Disposition` header between `inline` (preview, default) and `attachment` (download). The Download button is a plain `<a href>` element pointing at the proxy URL — right-click "Save as", middle-click new-tab, and Cmd-click all work natively.
 6. Free-tier users with `subscriptionTier === "FREE"` see their current CV-version count against the configured cap (e.g. `2 / 5 versions used`). When at or above the cap, the token route's `onBeforeGenerateToken` rejects the upload with a `Cap reached` error which the client surfaces inline. Pro-tier users see no count and never hit the cap.
-7. Both `confirmCvUpload` and `requestCvDownloadUrl` enforce ownership via `auth()` and scope every DB read/write to `session.user.id`. `requestCvDownloadUrl` rejects with `Not found` if the `CvVersion` does not belong to the caller — never leaking that a version exists for another user.
+7. The `confirmCvUpload` Server Action and the `/api/cv/[id]/file` proxy route both enforce ownership via `auth()` and scope every DB read to `session.user.id`. The proxy returns `404 Not found` for non-owners — never leaking that a version exists for another user.
 8. Successful upload re-renders the list (`router.refresh()`), shows a `Toast` with copy `CV "{name}" uploaded.`, and resets the dialog. Validation errors (wrong type, too large, network failure on PUT, cap reached) surface inline in the dialog without dismissing it.
 9. The flow is keyboard-navigable: Tab cycles through file picker → name input → Cancel → Upload; `Enter` confirms; `Esc` closes the dialog without uploading. The CV list is keyboard-accessible (download / view actions are real buttons).
 10. All Server Actions return the typed `ActionResult<T>` union and never throw to the client.
@@ -55,8 +55,8 @@ So that I have a versioned history of my CVs to choose from when applying.
   - [x] Create `src/actions/manage-cv.ts` with `"use server"`.
   - [x] `checkCvDuplicate({ fileHash })` — auth, queries `prisma.cvVersion.findFirst({ where: { userId, fileHash } })`, returns `{ data: { existing: { id, name } | null }, error: null }`.
   - [x] `confirmCvUpload({ blobUrl, name, fileSize, fileHash })` — auth, validates `blobUrl` looks like a Vercel Blob URL (sanity check — `https://`, no script chars), creates the `CvVersion` row with `s3Key = blobUrl`, `fileSize`, `fileHash`, `name` (defaulted if blank). On unique-constraint violation (race-condition duplicate), call `del(blobUrl)` from `@vercel/blob` to clean up the orphan blob and return `{ data: null, error: "This file is already uploaded" }`.
-  - [x] `requestCvDownloadUrl(cvVersionId)` — auth, `findFirst({ where: { id: cvVersionId, userId } })`, return `{ data: { url: cvVersion.s3Key, name: cvVersion.name }, error: null }` or `Not found`. The "URL" is the stored blob URL — short-lived expiry isn't available in Vercel Blob; auth scoping is the gate.
   - [x] `listCvVersions()` — auth, returns the user's CvVersions ordered by `uploadedAt desc`.
+  - [x] **No `requestCvDownloadUrl` Server Action.** The proxy route at `/api/cv/[id]/file` is the single browser-facing read path; there is no useful client-facing form of a private blob URL to mint, so a Server Action that returns one would be a misleading dead end.
   - [x] All actions return the `ActionResult<T>` union and never throw.
 
 - [x] Task 6 — `/cv` route + CV nav link (AC: 1, 6)
@@ -66,7 +66,7 @@ So that I have a versioned history of my CVs to choose from when applying.
   - [x] Update [_bmad-output/planning-artifacts/ux-design-specification.md](../planning-artifacts/ux-design-specification.md) to mention the new sidebar entry under "Navigation Patterns".
 
 - [x] Task 7 — `CvVersionsClient` + `CvUploadDialog` (AC: 1, 2, 3, 4, 6, 8, 9)
-  - [x] Create `src/components/cv/CvVersionsClient.tsx` — `"use client"`. Props: `versions`, `cap`. Header: page title + cap indicator + `Upload CV` button. List: rows with `name` (truncated), formatted upload date, `formatFileSize(fileSize)`, `Active` pill on row 0, and per-row `Download` button. Download button calls `requestCvDownloadUrl`, then `window.open(url)` in a new tab.
+  - [x] Create `src/components/cv/CvVersionsClient.tsx` — `"use client"`. Props: `versions`, `cap`. Header: page title + cap indicator + `Upload CV` button. Card grid: each card shows preview + `name` (truncated, full text on title hover) + formatted upload date + `formatFileSize(fileSize)` + a Download `<a href="/api/cv/[id]/file?download=1" target="_blank">` styled to match the `Button` ghost variant. `Active` pill overlays the top-right of the most recent card's preview.
   - [x] Create `src/components/cv/CvUploadDialog.tsx` — `"use client"`. Use a Base UI `Dialog` (centred) — the import drawer is a slide-in for board flow; CV upload is a focused single-action moment that suits a centred modal. Stages: `idle` (file picker + name input + Upload button) → `hashing` (computing SHA-256 — show a skeleton, no spinner) → `duplicate` (file already exists message + dismiss-only) → `uploading` (Vercel Blob upload in flight — skeleton field rows) → `error` (inline error retains state). On success: closes, calls `router.refresh()` on parent, fires Toast.
   - [x] Create `src/components/cv/computeFileHash.ts` — tiny helper that reads a `File` to ArrayBuffer, calls `crypto.subtle.digest("SHA-256", buf)`, hex-encodes the result. Pure (returns Promise<string>); unit-tested with a known fixture.
   - [x] Create `src/components/cv/formatFileSize.ts` — pure helper: `123` → `123 B`, `2300` → `2.2 KB`, `2_345_000` → `2.2 MB`, etc. Unit-tested.
@@ -79,7 +79,7 @@ So that I have a versioned history of my CVs to choose from when applying.
   - [x] Server Action tests in `src/actions/manage-cv.test.ts` mocking `@/lib/auth`, `@/lib/db`, `@vercel/blob`:
     - `checkCvDuplicate` — happy path (duplicate found, none found), rejects unauthenticated.
     - `confirmCvUpload` — happy path creates the row with `s3Key = blobUrl`; rejects unauthenticated; trims/defaults blank names; on unique-constraint violation calls `del(blobUrl)` and returns the duplicate error.
-    - `requestCvDownloadUrl` — returns URL for owner; returns `Not found` for non-owner; rejects unauthenticated.
+    - The proxy route `/api/cv/[id]/file` is covered by the integration story rather than unit tests — the route relies on the Vercel Blob `get()` stream, which is impractical to mock without writing a brittle stand-in. A request-response check during manual smoke testing (verify 200 PDF for owner, 404 for non-owner, 401 for unauthenticated) is sufficient at this stage.
   - [x] Entitlement test for `checkCvVersionCap` — `allowed: false` at cap, `allowed: true` below, `isPro: true` for Pro tier.
   - [x] Component test for `CvUploadDialog` rejecting non-PDF and >10MB files inline (no Server Action call). And: when `checkCvDuplicate` returns an existing version, the dialog shows the duplicate state, not the upload state.
 
@@ -122,7 +122,7 @@ The fix is a same-origin proxy route at `src/app/api/cv/[id]/file/route.ts`:
 3. Stream the bytes from Vercel Blob via `get(cv.s3Key, { access: 'private' })`.
 4. Respond with `Content-Type: application/pdf`, `Content-Disposition: inline`, and a 5-minute private cache-control so re-renders within a session don't re-stream.
 
-`<CvPreview url={`/api/cv/${id}/file`} />` is what the card uses. The blob URL never leaves the server. Bandwidth flows through the Vercel Function instead of directly browser→Blob — a small cost trade for a correct, secure preview path. The signed-URL flow remains in place for downloads (`requestCvDownloadUrl` → `head()` → `window.open(url)`), where CORS isn't a factor.
+`<CvPreview url={`/api/cv/${id}/file`} />` is what the card uses for the preview. The Download button renders as `<a href="/api/cv/${id}/file?download=1">` so the same proxy serves both flows. The blob URL never leaves the server. Bandwidth flows through the Vercel Function instead of directly browser→Blob — a small cost trade for a correct, secure delivery path that works for the private store. (We tried a Server Action returning a `head()`-derived URL for downloads first; it didn't work because Vercel Blob v2 doesn't expose a browser-usable signed URL form for private blobs — every direct navigation to such a URL returns 403. The proxy is the only viable approach.)
 
 ### What's already in place
 
@@ -288,11 +288,10 @@ export async function confirmCvUpload(input: {
   fileHash: string
 }): Promise<ActionResult<{ cvVersion: CvVersion }>>
 
-export async function requestCvDownloadUrl(
-  cvVersionId: string
-): Promise<ActionResult<{ url: string; name: string }>>
-
 export async function listCvVersions(): Promise<ActionResult<CvVersion[]>>
+
+// No requestCvDownloadUrl — the same-origin proxy /api/cv/[id]/file
+// handles browser-facing reads (preview + download).
 ```
 
 ### File-size formatting
@@ -313,7 +312,7 @@ export function formatFileSize(bytes: number): string {
 └── CvVersionsClient (Client Component)
     ├── header: title + "{count} / {cap} versions used" + Upload CV button
     ├── list: rows with name, uploaded date, file size, "Active" pill on first
-    │       └── per-row: Download (calls requestCvDownloadUrl, opens in new tab)
+    │       └── per-row: Download <a href="/api/cv/[id]/file?download=1" target="_blank"> (proxy returns Content-Disposition: attachment)
     └── CvUploadDialog (Base UI Dialog, centred)
         ├── stage: idle      → file picker + name input + Cancel/Upload buttons
         ├── stage: hashing   → skeletons (no spinner per design polish)
@@ -356,7 +355,7 @@ Add a third `<NavLink href="/cv">CVs</NavLink>` in `src/app/(dashboard)/layout.t
 ### Constraints
 
 - **No transactions, no `*Many` writes** (Neon HTTP rule from project-context.md). This story has no multi-row writes.
-- **Do not embed blob URLs in HTML.** Always go through `requestCvDownloadUrl`. Auth gates every download.
+- **Do not embed blob URLs in HTML and do not return them from Server Actions.** All browser-facing reads go through `/api/cv/[id]/file`. Auth + ownership are enforced inside the route.
 - **Do not use `revalidateTag`.** Use `router.refresh()`. Match the existing pattern.
 - **PDF only** for this story. DOCX is mentioned elsewhere but the AC says PDF; reject other types in the dialog and in the token route's `allowedContentTypes`.
 - **Do not rename `CvVersion.s3Key`.** Keeps the migration small; `s3Key` now stores the Vercel Blob URL. The misnomer is acknowledged in the schema comment.
@@ -446,3 +445,5 @@ claude-opus-4-7[1m]
 | 2026-05-06 | Switched store to **private** (matches Vercel config); download path mints fresh signed URL via `head()` on every request | claude-opus-4-7 |
 | 2026-05-06 | Replaced list view with **card grid + react-pdf page-1 thumbnails**; preview URLs pre-minted in the page Server Component | claude-opus-4-7 |
 | 2026-05-06 | Switched preview to a same-origin proxy (`/api/cv/[id]/file`) — CORS blocked direct XHR to private Vercel Blob URLs; account deletion now deletes CV blobs before the DB cascade; revokeGmailAccess now uses single-row delete (no `deleteMany`) | claude-opus-4-7 |
+| 2026-05-06 | Defer `react-pdf` to the browser via `next/dynamic({ ssr: false })` (DOMMatrix SSR crash); RFC 6266 filename encoding for non-ASCII names (em-dash 500) | claude-opus-4-7 |
+| 2026-05-06 | Unified the proxy: download button now uses `/api/cv/[id]/file?download=1` (Content-Disposition: attachment) instead of a Server Action — Vercel Blob v2 has no browser-usable signed-URL form for private blobs, so the proxy is the only viable read path. `requestCvDownloadUrl` Server Action removed. | claude-opus-4-7 |

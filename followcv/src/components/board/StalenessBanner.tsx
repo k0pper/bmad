@@ -11,7 +11,7 @@ export function StalenessBanner() {
       role="status"
     >
       <span aria-hidden="true">⏱</span>
-      <span>Vitality states may be outdated — recalculation runs hourly.</span>
+      <span>Vitality states may be outdated — recalculation runs daily.</span>
     </div>
   )
 }

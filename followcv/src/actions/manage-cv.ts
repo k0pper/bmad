@@ -1,6 +1,6 @@
 "use server"
 
-import { del, head } from "@vercel/blob"
+import { del } from "@vercel/blob"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import type { CvVersion } from "@/generated/prisma/client"
@@ -72,30 +72,6 @@ export async function confirmCvUpload(input: {
       return { data: null, error: "This file is already uploaded" }
     }
     return { data: null, error: "Failed to save CV version" }
-  }
-}
-
-export async function requestCvDownloadUrl(
-  cvVersionId: string
-): Promise<ActionResult<{ url: string; name: string }>> {
-  const session = await requireUser()
-  if (!session.ok) return { data: null, error: session.error }
-
-  const cvVersion = await prisma.cvVersion.findFirst({
-    where: { id: cvVersionId, userId: session.userId },
-    select: { s3Key: true, name: true },
-  })
-  if (!cvVersion) return { data: null, error: "Not found" }
-
-  // For private blobs the signature in the stored URL eventually expires, so
-  // we re-mint a fresh signed URL on every download via head(). The SDK
-  // accepts either a full URL or a pathname; auth comes from the server-side
-  // BLOB_READ_WRITE_TOKEN env var, not from any signature on the stored URL.
-  try {
-    const blobMeta = await head(cvVersion.s3Key)
-    return { data: { url: blobMeta.url, name: cvVersion.name }, error: null }
-  } catch {
-    return { data: null, error: "Could not generate download URL" }
   }
 }
 

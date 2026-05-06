@@ -6,12 +6,21 @@ import { buildContentDisposition } from "@/lib/http/contentDisposition"
 /**
  * Same-origin proxy that streams a CV file from Vercel Blob to the browser.
  *
+ * Used by both the page-1 preview (`react-pdf`) and the Download button.
+ *
  * Why this exists:
- *   Vercel Blob private signed URLs are not CORS-friendly — `react-pdf`'s
- *   XHR fetch from the browser to the blob host is blocked, even though
- *   browser navigation (download click) works fine. Proxying the bytes
- *   through a same-origin route bypasses CORS entirely. Bonus: the blob URL
- *   never leaves the server.
+ *   Private Vercel Blob URLs are auth'd by the server-side
+ *   `BLOB_READ_WRITE_TOKEN` env var, not by any signature on the URL itself.
+ *   Opening such a URL directly from the browser returns a 403 forbidden
+ *   page; XHR fetches are blocked by CORS. Proxying the bytes through this
+ *   same-origin route is the only way to deliver a private blob to the
+ *   user's browser. The blob URL never leaves the server.
+ *
+ * Modes:
+ *   - default (preview): `Content-Disposition: inline`, browser renders
+ *     in-place (e.g. into a canvas via pdf.js).
+ *   - `?download=1`: `Content-Disposition: attachment`, browser saves to
+ *     disk with the CV's name as the filename.
  *
  * Auth contract:
  *   The route requires a valid session AND the requested CvVersion must
@@ -19,7 +28,7 @@ import { buildContentDisposition } from "@/lib/http/contentDisposition"
  *   non-owners so the existence of someone else's CV is never leaked.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const session = await auth()
@@ -47,16 +56,17 @@ export async function GET(
     return new Response("Not found", { status: 404 })
   }
 
+  const isDownload =
+    new URL(request.url).searchParams.get("download") === "1"
+
   return new Response(result.stream, {
     headers: {
       "Content-Type": "application/pdf",
-      // Hint the browser to render inline (the preview renders to a canvas;
-      // for downloads, the dedicated requestCvDownloadUrl flow is used).
       // RFC 6266-compliant encoding handles non-ASCII names like the default
       // `CV — 2026-05-06` (em-dash is U+2014, > 255 byte) without crashing
       // the Response constructor.
       "Content-Disposition": buildContentDisposition(
-        "inline",
+        isDownload ? "attachment" : "inline",
         `${cv.name}.pdf`
       ),
       // Five-minute private cache so refreshing /cv doesn't re-stream every
