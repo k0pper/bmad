@@ -1,6 +1,6 @@
 # Story 2.6: Board Filtering, Sorting & Search
 
-Status: review
+Status: done
 
 ## Story
 
@@ -263,3 +263,6 @@ claude-opus-4-7[1m]
 |------|--------|--------|
 | 2026-05-06 | Story created | bmad-create-story |
 | 2026-05-06 | All tasks implemented; lint, types, 149 tests green; status → review | claude-opus-4-7 |
+| 2026-05-06 | Two-row filter bar layout; "Clear all filters" rename | claude-opus-4-7 |
+| 2026-05-06 | Reusable Dropdown component with z-[60] above sidebar | claude-opus-4-7 |
+| 2026-05-06 | Reviewed by user; status → done | Alex |

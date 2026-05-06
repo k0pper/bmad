@@ -1,6 +1,6 @@
 # Story 2.5: Manual Vitality Override & Listing Management
 
-Status: review
+Status: done
 
 ## Story
 
