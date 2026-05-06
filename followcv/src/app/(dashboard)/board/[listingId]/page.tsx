@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db"
 import { VitalityBadge } from "@/components/vitality/VitalityBadge"
 import { DetailAccordion } from "@/components/listing/DetailAccordion"
 import { VitalityExplanation } from "@/components/listing/VitalityExplanation"
-import { explainVitalityState } from "@/lib/services/vitality-state-machine"
+import { explainVitalityState, computeVitalityState } from "@/lib/services/vitality-state-machine"
 import type { VitalityState, ApplicationStatus } from "@/generated/prisma/client"
 
 function formatSalary(min: number | null, max: number | null, currency: string | null): string | null {
@@ -42,7 +42,8 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
     orderBy: { computedAt: "desc" },
   })
 
-  const explanation = explainVitalityState({
+  const now = new Date()
+  const inputs = {
     postedAt: listing.postedAt,
     closingDate: listing.closingDate,
     application: listing.application
@@ -52,8 +53,25 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
     overrideState: listing.overrideState as VitalityState | null,
     overrideSource: listing.overrideSource,
     isArchived: listing.archived,
-    now: new Date(),
-  })
+    now,
+  }
+
+  const explanation = explainVitalityState(inputs)
+  const freshState = computeVitalityState(inputs)
+
+  let displayState = listing.vitalityState as VitalityState
+  if (freshState !== null && freshState !== listing.vitalityState) {
+    await prisma.jobListing.update({
+      where: { id: listing.id },
+      data: { vitalityState: freshState, stateChangedAt: now, lastComputedAt: now },
+    })
+    try {
+      await prisma.auditLog.create({
+        data: { source: "SYSTEM_RECOMPUTE", userId: session.user.id, listingId: listing.id, newState: freshState, computedAt: now },
+      })
+    } catch { /* non-critical */ }
+    displayState = freshState
+  }
 
   const salary = formatSalary(listing.salaryMin, listing.salaryMax, listing.salaryCurrency)
 
@@ -65,7 +83,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       children: (
         <VitalityExplanation
           explanation={explanation}
-          finalState={listing.vitalityState as VitalityState}
+          finalState={displayState}
         />
       ),
     },
@@ -130,7 +148,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             </p>
           </div>
           <div className="flex-shrink-0 mt-0.5">
-            <VitalityBadge state={listing.vitalityState as VitalityState} />
+            <VitalityBadge state={displayState} />
           </div>
         </div>
 
