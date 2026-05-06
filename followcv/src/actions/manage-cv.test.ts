@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }))
-vi.mock("@vercel/blob", () => ({ del: vi.fn() }))
+vi.mock("@vercel/blob", () => ({ del: vi.fn(), head: vi.fn() }))
 vi.mock("@/lib/db", () => ({
   prisma: {
     cvVersion: {
@@ -19,13 +19,14 @@ import {
   listCvVersions,
 } from "./manage-cv"
 import { auth } from "@/lib/auth"
-import { del } from "@vercel/blob"
+import { del, head } from "@vercel/blob"
 import { prisma } from "@/lib/db"
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn> & {
   mockResolvedValue: (v: unknown) => void
 }
 const mockDel = del as unknown as ReturnType<typeof vi.fn>
+const mockHead = head as unknown as ReturnType<typeof vi.fn>
 
 type MockPrisma = {
   cvVersion: {
@@ -207,16 +208,29 @@ describe("requestCvDownloadUrl", () => {
     })
   })
 
-  it("returns the URL and name for the owner", async () => {
+  it("returns a freshly-signed URL from head() for the owner", async () => {
+    const FRESH_URL = "https://abc.private.blob.vercel-storage.com/cv-1.pdf?sig=fresh"
     mockPrisma.cvVersion.findFirst.mockResolvedValue({
       s3Key: VALID_BLOB_URL,
       name: "Senior CV",
     })
+    mockHead.mockResolvedValue({ url: FRESH_URL })
     const r = await requestCvDownloadUrl("cv-1")
     expect(r).toEqual({
-      data: { url: VALID_BLOB_URL, name: "Senior CV" },
+      data: { url: FRESH_URL, name: "Senior CV" },
       error: null,
     })
+    expect(mockHead).toHaveBeenCalledWith(VALID_BLOB_URL)
+  })
+
+  it("returns a friendly error when head() fails (e.g. blob deleted)", async () => {
+    mockPrisma.cvVersion.findFirst.mockResolvedValue({
+      s3Key: VALID_BLOB_URL,
+      name: "Senior CV",
+    })
+    mockHead.mockRejectedValue(new Error("blob not found"))
+    const r = await requestCvDownloadUrl("cv-1")
+    expect(r.error).toBe("Could not generate download URL")
   })
 })
 
