@@ -26,6 +26,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Navigation */}
         <nav className="flex-1 px-3 py-2 space-y-0.5" aria-label="Main navigation">
           <NavLink href="/board">Board</NavLink>
+          <NavLink href="/cv">CVs</NavLink>
           <NavLink href="/settings">Settings</NavLink>
         </nav>
 
