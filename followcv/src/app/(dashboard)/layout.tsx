@@ -8,7 +8,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <div className="flex h-screen overflow-hidden">
       <SidebarShell width="var(--sidebar-width)">
         {/* Brand */}
-        <div className="px-4 py-3 border-b border-border">
+        <div className="px-5 py-4">
           <Link
             href="/"
             className="text-base font-semibold tracking-tight"
@@ -18,23 +18,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </Link>
         </div>
 
-        {/* Health score slot — wired up in Story 4.1 */}
-        <div
-          data-testid="health-score-slot"
-          className="p-4 border-b border-border"
-        />
+        {/* Health score slot — wired up in Story 4.1; invisible until then */}
+        <div data-testid="health-score-slot" />
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1" aria-label="Main navigation">
+        <nav className="flex-1 px-3 py-2 space-y-0.5" aria-label="Main navigation">
           <Link
             href="/board"
-            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-text-secondary transition-colors hover:bg-slate-100"
+            className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-slate-100"
+            style={{ color: 'var(--color-text-secondary)' }}
           >
             Board
           </Link>
           <Link
             href="/settings"
-            className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-text-secondary transition-colors hover:bg-slate-100"
+            className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-slate-100"
+            style={{ color: 'var(--color-text-secondary)' }}
           >
             Settings
           </Link>
