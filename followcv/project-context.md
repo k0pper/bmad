@@ -42,25 +42,32 @@ When adding new Server Actions, call `router.refresh()` from the calling Client 
 
 All Server Actions return the typed union `ActionResult<T> = { data: T; error: null } | { data: null; error: string }` and **never throw**. Authentication via `auth()` is mandatory; every DB read/write must be scoped to the authenticated user's `id`.
 
-## Object storage — Vercel Blob (not Cloudflare R2)
+## Object storage — Vercel Blob (private store, not Cloudflare R2)
 
-CV files are stored in **Vercel Blob**, not Cloudflare R2. The architecture document (`_bmad-output/planning-artifacts/architecture.md`) still mentions R2; it's historical context. The binding decision is in [`_bmad-output/implementation-artifacts/3-1-cv-upload-and-version-history.md`](../_bmad-output/implementation-artifacts/3-1-cv-upload-and-version-history.md).
+CV files are stored in **Vercel Blob**, configured as a **private** store. The architecture document (`_bmad-output/planning-artifacts/architecture.md`) still mentions R2; it's historical context. The binding decision is in [`_bmad-output/implementation-artifacts/3-1-cv-upload-and-version-history.md`](../_bmad-output/implementation-artifacts/3-1-cv-upload-and-version-history.md).
 
-**Why:** zero infra setup, native Vercel integration, single env var, free tier on Hobby plan. R2's egress-free pricing was attractive but the operational simplicity won.
+**Why Vercel Blob:** zero infra setup, native Vercel integration, single env var, free tier on Hobby plan.
 
-**Trade-offs to know about:**
+**Why private (not public):** the store is configured private in the Vercel dashboard. Private blobs are not publicly fetchable — every request is authenticated by a short-lived signature minted by the SDK with the server-side `BLOB_READ_WRITE_TOKEN`. This is meaningfully closer to FR34's "per-request authenticated access tokens that expire after use" intent than the original public-blob plan.
 
-- Vercel Blob URLs are **public-but-unguessable and permanent** — there is no native "expiring URL" feature. Auth is enforced at the application layer: the URL is never embedded in HTML and is only returned to the owner via authenticated Server Actions (`requestCvDownloadUrl`). The URL is treated as a capability token.
-- This is a deliberate, documented divergence from FR34 ("per-request authenticated access tokens that expire after use"). Materially close to the spec's intent (no public bucket, every download authenticated) but lacks a TTL on the URL itself.
+**Operational rules:**
+
+- **Upload:** SDK call must declare `access: "private"` to match the store. Calling `access: "public"` returns `bad_request: Cannot use public access on a private store`.
+- **Download:** the URL returned at upload-time carries a signature with a TTL. **Do not** store and re-serve it indefinitely — it expires. Instead, mint a fresh signed URL on every request via `head(stored_blob_url)` from `@vercel/blob`. `head()` accepts either a full URL or a pathname; auth comes from the env-side token, not from any signature on the input.
+- The implementation pattern lives in [`requestCvDownloadUrl`](../followcv/src/actions/manage-cv.ts).
 
 **Env vars:**
 
 - `BLOB_READ_WRITE_TOKEN` — Vercel-injected when a Blob store is connected to the project. Pull locally with `vercel env pull .env.local`. **Never commit.**
 
+**Local-dev gotcha — `onUploadCompleted` webhook:**
+
+Do **NOT** pass `onUploadCompleted` to `handleUpload` in the upload-token API route, even as a no-op. Providing the property — empty body or not — makes the SDK try to set up a webhook callback after the PUT, and in local dev there's no publicly-reachable callback URL, so the upload hangs forever after the bytes land. The CV row is created from the client by calling `confirmCvUpload` synchronously after `upload()` resolves; the webhook is unnecessary.
+
 **Pattern for new code:**
 
-- Server Actions that need to issue a download URL: `findFirst` scoped to `session.user.id`, return `cvVersion.s3Key` (which holds the blob URL) only when ownership matches.
-- Direct client uploads use `@vercel/blob/client`'s `upload()` with `handleUploadUrl` pointing at an API route that wraps `handleUpload({ onBeforeGenerateToken })` for auth + cap checks.
+- Direct client uploads use `@vercel/blob/client`'s `upload()` with `handleUploadUrl` pointing at an API route that wraps `handleUpload({ onBeforeGenerateToken })` for auth + cap checks. Omit `onUploadCompleted`.
+- Server Actions that need to issue a download URL: `findFirst` scoped to `session.user.id`, then `head(cvVersion.s3Key)` and return `meta.url`.
 - The `CvVersion.s3Key` column name is a misnomer (legacy from the R2 draft) — it stores the Vercel Blob URL. Don't rename without a coordinated migration.
 
 ## Schema columns that mean something different than they look

@@ -10,7 +10,7 @@ So that I have a versioned history of my CVs to choose from when applying.
 
 ## Acceptance Criteria
 
-1. The user has a dedicated CV management surface accessible from the dashboard sidebar (new `CVs` nav link). The page renders a list of the user's existing `CvVersion` records (newest first) with `name`, upload date, file size in human-readable form (`123 KB`, `2.4 MB`), and a clear "active" indicator on the most recently uploaded version.
+1. The user has a dedicated CV management surface accessible from the dashboard sidebar (new `CVs` nav link). The page renders the user's existing `CvVersion` records (newest first) as a **responsive card grid** — 1 column on mobile, 2 on `sm`, 3 on `lg`. Each card shows a **rendered PDF preview of page 1** filling the top portion of the card at A4 portrait aspect ratio (1:√2). Below the preview: `name` (truncated, full text on hover), upload date, file size in human-readable form (`123 KB`, `2.4 MB`), and a Download button. The most recently uploaded card carries an "Active" pill in its top-right corner. The preview gives the user instant visual recognition between visually distinct CV templates without having to read the names — the primary motivation for this surface.
 2. An "Upload CV" affordance opens an upload dialog. The dialog accepts a single PDF file (drag-or-click), validates that the file is `application/pdf` and ≤10 MB inline before upload, and prompts the user to give the version a name with a default of `CV — {YYYY-MM-DD}`. Empty / whitespace-only names fall back to the default.
 3. Before uploading, the client computes a SHA-256 hash of the file using Web Crypto (`crypto.subtle.digest`). A Server Action (`checkCvDuplicate`) is called with the hash. If a `CvVersion` already exists for this user with that hash, the upload **does not happen** — the dialog instead shows: "You already have this file uploaded as **{existingName}**" with a link to the existing version and a single button to dismiss the dialog.
 4. When no duplicate is detected, the upload uses **Vercel Blob's client-upload flow** — direct browser → Blob, bypassing the Vercel function body limit:
@@ -18,7 +18,7 @@ So that I have a versioned history of my CVs to choose from when applying.
    - The token route does `auth()` + cap check inside `onBeforeGenerateToken` and returns a token allowing only `application/pdf`, max 10 MB. **It does not write to the DB.**
    - On successful PUT, the client receives `{ url, contentDisposition, ... }` from Vercel Blob.
    - The client then calls a `confirmCvUpload({ blobUrl, name, fileSize, fileHash })` Server Action which auth-checks, re-derives ownership, and creates the `CvVersion` row with `s3Key = blobUrl`, `fileSize`, `fileHash`.
-5. CV files are served via Server-Action-generated download URLs (`requestCvDownloadUrl`). Vercel Blob URLs are unguessable but permanent — the URL is the capability — so the application enforces auth on every download by requiring a `cvVersionId` lookup scoped to the caller, returning the URL only when the caller is the owner. **The blob URL is never embedded in HTML** and never exposed to a non-owner.
+5. CV files are served via Server-Action-generated download URLs (`requestCvDownloadUrl`). The Vercel Blob store is **private**, so blob URLs carry a short-lived signature minted by the SDK using the server-side `BLOB_READ_WRITE_TOKEN`. The Server Action calls `head(cvVersion.s3Key)` from `@vercel/blob` on every request to mint a fresh signed URL — **the URL stored at upload time eventually expires and must not be served back directly**. The application enforces auth before minting: `findFirst` scoped to the caller's `userId`, return `Not found` for non-owners. The same fresh-URL flow powers the card-grid PDF previews (server pre-mints them in the page Server Component to avoid a fan-out of client-side action calls on first paint).
 6. Free-tier users with `subscriptionTier === "FREE"` see their current CV-version count against the configured cap (e.g. `2 / 5 versions used`). When at or above the cap, the token route's `onBeforeGenerateToken` rejects the upload with a `Cap reached` error which the client surfaces inline. Pro-tier users see no count and never hit the cap.
 7. Both `confirmCvUpload` and `requestCvDownloadUrl` enforce ownership via `auth()` and scope every DB read/write to `session.user.id`. `requestCvDownloadUrl` rejects with `Not found` if the `CvVersion` does not belong to the caller — never leaking that a version exists for another user.
 8. Successful upload re-renders the list (`router.refresh()`), shows a `Toast` with copy `CV "{name}" uploaded.`, and resets the dialog. Validation errors (wrong type, too large, network failure on PUT, cap reached) surface inline in the dialog without dismissing it.
@@ -84,16 +84,35 @@ So that I have a versioned history of my CVs to choose from when applying.
 
 ## Dev Notes
 
-### Storage choice — Vercel Blob, not Cloudflare R2
+### Storage choice — Vercel Blob (private store), not Cloudflare R2
 
-The architecture document and earlier story drafts referenced Cloudflare R2 + AWS SDK v3 with pre-signed PUT/GET URLs. **This story diverges from that on cost grounds.** The project switches to Vercel Blob:
+The architecture document and earlier story drafts referenced Cloudflare R2 + AWS SDK v3 with pre-signed PUT/GET URLs. **This story diverges from that on cost grounds.** The project switches to Vercel Blob, configured as a **private** store:
 
 - ✅ **Pros:** zero infrastructure setup, native Vercel integration, single env var, simpler client-upload SDK, free tier on Hobby plan.
-- ⚠️ **Cons:** no native expiring URLs — blob URLs are permanent and public-but-unguessable. Auth is enforced at the application layer (URLs only returned to owners by authenticated Server Actions, never embedded in HTML).
-
-**Trade-off vs FR34 / NFR-S2** ("CV files via per-request authenticated tokens that expire after use"): Vercel Blob URLs don't expire. Mitigation: the URL is treated as a capability token and is never given to a non-owner. The same authenticated user who uploaded the file is the only one who can ever obtain its URL via `requestCvDownloadUrl`. This is materially close to the spec's intent (no public bucket access, every download authenticated) — it just doesn't have a 15-minute TTL on the URL itself. Document the divergence in `project-context.md` and revisit if a tier change makes signed URLs available.
+- ✅ **Private blobs satisfy FR34 cleanly:** every URL the SDK returns carries a short-lived signature minted with the server-side `BLOB_READ_WRITE_TOKEN`. There is no public bucket access. Mint a fresh URL on each download via `head()`.
+- ⚠️ **Operational gotcha** (also recorded in `project-context.md`): the upload SDK call must declare `access: "private"` to match the store. `access: "public"` returns `bad_request: Cannot use public access on a private store`. Likewise, do not store and re-serve the URL returned at upload time — the signature on that URL expires; always re-mint via `head()` on download.
 
 The architecture.md document still references R2 in several places. **Do not** attempt to update architecture.md from this story — that's a separate planning-artifact rewrite and out of scope. The Story 3.1 spec and `project-context.md` are the binding sources of truth for implementers; architecture.md is treated as historical context until an explicit revisit.
+
+### PDF preview cards — why react-pdf, not iframe or server-side thumbnails
+
+The grid layout requires page-1 thumbnails. Three options were considered:
+
+1. **`<iframe src=blobUrl>`** — browser-native PDF rendering. Cross-browser inconsistent (Chrome shows toolbar, Safari renders differently, Firefox sometimes prompts for download). Rejected.
+2. **Server-side thumbnail generation on upload** — render page 1 to a JPEG/PNG, upload as a sibling blob, store URL alongside `CvVersion`. Best long-term solution but every PDF→raster lib in Node either needs native binaries (`pdf-poppler`) or a headless browser, both of which struggle in Vercel Functions. Out of scope for this story; revisit when render volume justifies it.
+3. **Client-side render via `react-pdf`** (chosen) — wraps `pdfjs-dist`, renders page 1 to a `<canvas>` in the browser. Each card fetches its private blob URL once, renders a thumbnail, done. Works for the free-tier scale (≤5 CVs per user). Trade-off: PDF.js is a heavy bundle (~1MB), so the `/cv` route ships more JS than the rest of the app. Acceptable for a settings-style page that isn't on the hot path.
+
+**Implementation specifics for `react-pdf`:**
+
+- Import inside a `"use client"` component only — pdfjs-dist is not SSR-compatible.
+- Configure the worker via the CDN: `pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs``. Bundling the worker through Turbopack is brittle; the CDN copy is pinned to the bundled pdfjs version so they're always in sync.
+- Disable text and annotation layers (`renderTextLayer={false} renderAnnotationLayer={false}`) — they're not visible in a thumbnail and add cost.
+- Render `<Page pageNumber={1} width={240} />` — fixed width keeps the canvas size predictable; the card's aspect-ratio container handles the visual sizing.
+- Provide `loading` and `error` slots (skeleton + fallback icon respectively) — never crash a card if a single PDF fails to parse.
+
+**Server-side preview-URL pre-mint:**
+
+Each card needs a signed URL to render. Two options: client fetches via `requestCvDownloadUrl` per-card on mount (N round-trips), or server pre-mints all URLs in the `/cv` page Server Component using `head()` and passes them to the Client Component as props (one batched fetch). The pre-mint approach is in use here — fewer round-trips, URLs are valid for the immediate session, no flash of "loading" on first paint. If `head()` fails for one row (blob deleted, store down), that card falls back to a placeholder icon while the others render.
 
 ### What's already in place
 
@@ -299,7 +318,7 @@ Add a third `<NavLink href="/cv">CVs</NavLink>` in `src/app/(dashboard)/layout.t
 
 ### Files touched (reference)
 
-- `package.json` — UPDATE (add `@vercel/blob`)
+- `package.json` — UPDATE (add `@vercel/blob`, `react-pdf`)
 - `prisma/schema.prisma` — UPDATE (`fileHash` column, `@@unique([userId, fileHash])`)
 - `prisma/migrations/<ts>_add_cv_version_file_hash/` — NEW (generated)
 - `.env.example` — UPDATE (`BLOB_READ_WRITE_TOKEN`)
@@ -308,14 +327,15 @@ Add a third `<NavLink href="/cv">CVs</NavLink>` in `src/app/(dashboard)/layout.t
 - `src/lib/services/entitlement-service.test.ts` — NEW
 - `src/actions/manage-cv.ts` — NEW
 - `src/actions/manage-cv.test.ts` — NEW
-- `src/components/cv/CvVersionsClient.tsx` — NEW
+- `src/components/cv/CvVersionsClient.tsx` — NEW (card grid, not list)
 - `src/components/cv/CvUploadDialog.tsx` — NEW
+- `src/components/cv/CvPreview.tsx` — NEW (react-pdf wrapper, page 1 thumbnail)
 - `src/components/cv/computeFileHash.ts` — NEW
 - `src/components/cv/computeFileHash.test.ts` — NEW
 - `src/components/cv/formatFileSize.ts` — NEW
 - `src/components/cv/formatFileSize.test.ts` — NEW
-- `src/app/(dashboard)/cv/page.tsx` — NEW
-- `src/app/(dashboard)/cv/loading.tsx` — NEW
+- `src/app/(dashboard)/cv/page.tsx` — NEW (Server Component pre-mints preview URLs via `head()`)
+- `src/app/(dashboard)/cv/loading.tsx` — NEW (skeleton matches the card grid)
 - `src/app/(dashboard)/layout.tsx` — UPDATE (CVs nav link)
 - `followcv/project-context.md` — UPDATE (Vercel Blob section)
 - `_bmad-output/planning-artifacts/ux-design-specification.md` — UPDATE (sidebar nav entry under Navigation Patterns)
@@ -410,3 +430,5 @@ claude-opus-4-7[1m]
 | 2026-05-06 | Story created (R2 / AWS SDK draft) | bmad-create-story |
 | 2026-05-06 | Switched storage to Vercel Blob; added SHA-256 dedup with `@@unique([userId, fileHash])` constraint | claude-opus-4-7 |
 | 2026-05-06 | All tasks implemented; lint, types, 187 tests green; status → review | claude-opus-4-7 |
+| 2026-05-06 | Switched store to **private** (matches Vercel config); download path mints fresh signed URL via `head()` on every request | claude-opus-4-7 |
+| 2026-05-06 | Replaced list view with **card grid + react-pdf page-1 thumbnails**; preview URLs pre-minted in the page Server Component | claude-opus-4-7 |
