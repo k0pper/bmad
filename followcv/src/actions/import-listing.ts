@@ -68,8 +68,11 @@ export async function importFromUrl(formData: FormData): Promise<ActionResult<Im
       salaryMax: scraped.data.salaryMax ?? null,
       salaryCurrency: scraped.data.salaryCurrency ?? "USD",
       sourceUrl: url,
+      postedAt: scraped.data.postedAt ?? null,
+      closingDate: scraped.data.closingDate ?? null,
       importSource: "URL_IMPORT",
       vitalityState,
+      stateChangedAt: now,
       lastComputedAt: now,
     },
   })
@@ -87,7 +90,6 @@ export async function importFromUrl(formData: FormData): Promise<ActionResult<Im
   } catch {
     // non-critical — log creation failure should not block import
   }
-
 
   return {
     data: {
@@ -137,8 +139,11 @@ export async function importFromUrlForced(url: string): Promise<ActionResult<Imp
       salaryMax: scraped.data.salaryMax ?? null,
       salaryCurrency: scraped.data.salaryCurrency ?? "USD",
       sourceUrl: url,
+      postedAt: scraped.data.postedAt ?? null,
+      closingDate: scraped.data.closingDate ?? null,
       importSource: "URL_IMPORT",
       vitalityState,
+      stateChangedAt: now,
       lastComputedAt: now,
     },
   })
@@ -156,7 +161,6 @@ export async function importFromUrlForced(url: string): Promise<ActionResult<Imp
   } catch {
     // non-critical
   }
-
 
   return {
     data: {
@@ -215,6 +219,7 @@ export async function manualImportListing(formData: FormData): Promise<ActionRes
       notes: parsed.data.notes ?? null,
       importSource: "MANUAL",
       vitalityState,
+      stateChangedAt: now,
       lastComputedAt: now,
     },
   })
