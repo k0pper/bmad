@@ -4,10 +4,11 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Menu } from "@base-ui/react/menu"
 import { VitalityBadge } from "@/components/vitality/VitalityBadge"
-import { UndoToast } from "@/components/ui/UndoToast"
+import { Toast } from "@/components/ui/Toast"
 import {
   overrideVitality,
   clearVitalityOverride,
+  undoVitalityOverride,
   type VitalityOverrideSnapshot,
 } from "@/actions/listing"
 import type { OverrideSource, VitalityState } from "@/generated/prisma/client"
@@ -138,10 +139,17 @@ export function VitalityOverrideMenu({ listingId, currentState, overrideSource }
         </p>
       )}
       {toast && (
-        <UndoToast
-          listingId={toast.listingId}
-          snapshot={toast.snapshot}
+        <Toast
           message={toast.message}
+          durationSeconds={30}
+          action={{
+            label: "Undo",
+            pendingLabel: "Undoing…",
+            onAction: async () => {
+              const result = await undoVitalityOverride(toast.listingId, toast.snapshot)
+              if (result.error === null) router.refresh()
+            },
+          }}
           onDismiss={() => setToast(null)}
         />
       )}

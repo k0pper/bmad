@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { updateListing } from "@/actions/listing"
 import { Button } from "@/components/ui/button"
+import { Toast } from "@/components/ui/Toast"
 
 type InitialValues = {
   title: string
@@ -29,19 +30,18 @@ function toDateInput(d: Date | null): string {
 export function ListingEditForm({ listingId, initialValues }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [showSavedToast, setShowSavedToast] = useState(false)
   const router = useRouter()
 
   function handleSubmit(formData: FormData) {
     setError(null)
-    setSuccess(false)
     startTransition(async () => {
       const result = await updateListing(listingId, formData)
       if (result.error !== null) {
         setError(result.error)
         return
       }
-      setSuccess(true)
+      setShowSavedToast(true)
       router.refresh()
     })
   }
@@ -102,15 +102,17 @@ export function ListingEditForm({ listingId, initialValues }: Props) {
           {error}
         </p>
       )}
-      {success && (
-        <p className="text-sm" style={{ color: "var(--color-success, #047857)" }}>
-          Saved.
-        </p>
-      )}
-
       <Button type="submit" variant="brand" size="lg" disabled={isPending}>
         {isPending ? "Saving…" : "Save changes"}
       </Button>
+
+      {showSavedToast && (
+        <Toast
+          message="Changes saved."
+          durationSeconds={5}
+          onDismiss={() => setShowSavedToast(false)}
+        />
+      )}
     </form>
   )
 }

@@ -2,42 +2,43 @@
 
 import { useEffect, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
-import { useRouter } from "next/navigation"
-import { undoVitalityOverride, type VitalityOverrideSnapshot } from "@/actions/listing"
 
-const TOAST_DURATION_SECONDS = 30
+type ToastAction = {
+  label: string
+  onAction: () => Promise<void> | void
+  pendingLabel?: string
+}
 
 type Props = {
-  listingId: string
-  snapshot: VitalityOverrideSnapshot
   message: string
+  durationSeconds?: number
+  action?: ToastAction
   onDismiss: () => void
 }
 
-export function UndoToast({ listingId, snapshot, message, onDismiss }: Props) {
-  const [secondsLeft, setSecondsLeft] = useState(TOAST_DURATION_SECONDS)
+export function Toast({ message, durationSeconds = 5, action, onDismiss }: Props) {
+  const [secondsLeft, setSecondsLeft] = useState(durationSeconds)
   const [isPending, startTransition] = useTransition()
-  const undoButtonRef = useRef<HTMLButtonElement>(null)
-  const router = useRouter()
+  const actionButtonRef = useRef<HTMLButtonElement>(null)
+  const dismissButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     // Dismiss any other toast that may be active.
-    const event = new CustomEvent("undo-toast-show")
-    window.dispatchEvent(event)
+    window.dispatchEvent(new CustomEvent("toast-show"))
     function handleOtherShown() {
       onDismiss()
     }
-    // Subscribe AFTER dispatching so we don't dismiss ourselves.
     queueMicrotask(() => {
-      window.addEventListener("undo-toast-show", handleOtherShown)
+      window.addEventListener("toast-show", handleOtherShown)
     })
     return () => {
-      window.removeEventListener("undo-toast-show", handleOtherShown)
+      window.removeEventListener("toast-show", handleOtherShown)
     }
   }, [onDismiss])
 
   useEffect(() => {
-    undoButtonRef.current?.focus()
+    // Focus the action button if present, else the dismiss button.
+    ;(actionButtonRef.current ?? dismissButtonRef.current)?.focus()
   }, [])
 
   useEffect(() => {
@@ -57,13 +58,14 @@ export function UndoToast({ listingId, snapshot, message, onDismiss }: Props) {
     return () => document.removeEventListener("keydown", handleKey)
   }, [onDismiss])
 
-  function handleUndo() {
+  function handleAction() {
+    if (!action) return
     startTransition(async () => {
-      const result = await undoVitalityOverride(listingId, snapshot)
-      if (result.error === null) {
-        router.refresh()
+      try {
+        await action.onAction()
+      } finally {
+        onDismiss()
       }
-      onDismiss()
     })
   }
 
@@ -79,21 +81,26 @@ export function UndoToast({ listingId, snapshot, message, onDismiss }: Props) {
       <span className="text-sm" style={{ color: "var(--color-text-primary)" }}>
         {message}
       </span>
+      {action && (
+        <button
+          ref={actionButtonRef}
+          type="button"
+          onClick={handleAction}
+          disabled={isPending}
+          className="rounded-md px-3 py-1 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-60"
+          style={{ backgroundColor: "var(--color-brand)", color: "white" }}
+        >
+          {isPending
+            ? action.pendingLabel ?? `${action.label}…`
+            : `${action.label} (${secondsLeft}s)`}
+        </button>
+      )}
       <button
-        ref={undoButtonRef}
-        type="button"
-        onClick={handleUndo}
-        disabled={isPending}
-        className="rounded-md px-3 py-1 text-sm font-medium hover:opacity-90 disabled:opacity-60"
-        style={{ backgroundColor: "var(--color-brand)", color: "white" }}
-      >
-        {isPending ? "Undoing…" : `Undo (${secondsLeft}s)`}
-      </button>
-      <button
+        ref={dismissButtonRef}
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss"
-        className="text-sm"
+        className="rounded text-sm transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         style={{ color: "var(--color-text-tertiary)" }}
       >
         ×
