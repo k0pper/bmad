@@ -23,7 +23,6 @@ import {
   confirmCvUpload,
   listCvVersions,
   renameCvVersion,
-  duplicateCvVersion,
   restoreCvVersion,
   deleteCvVersion,
 } from "./manage-cv"
@@ -255,53 +254,6 @@ describe("renameCvVersion", () => {
   })
 })
 
-describe("duplicateCvVersion", () => {
-  const original = {
-    id: "cv-1",
-    userId: "user-1",
-    name: "Senior CV",
-    s3Key: VALID_BLOB_URL,
-    fileSize: 1024,
-    fileHash: VALID_HASH,
-  }
-
-  it("rejects unauthenticated", async () => {
-    mockAuth.mockResolvedValue(null)
-    const r = await duplicateCvVersion({ id: "cv-1" })
-    expect(r).toEqual({ data: null, error: "Unauthorized" })
-  })
-
-  it("returns Not found when version does not belong to user", async () => {
-    mockPrisma.cvVersion.findFirst.mockResolvedValue(null)
-    const r = await duplicateCvVersion({ id: "cv-999" })
-    expect(r).toEqual({ data: null, error: "Not found" })
-  })
-
-  it("returns cap error when limit is reached", async () => {
-    mockPrisma.cvVersion.findFirst.mockResolvedValue(original)
-    mockCheckCap.mockResolvedValue({ allowed: false, count: 5, cap: 5, isPro: false })
-    const r = await duplicateCvVersion({ id: "cv-1" })
-    expect(r.error).toContain("CV version limit reached")
-    expect(mockPrisma.cvVersion.create).not.toHaveBeenCalled()
-  })
-
-  it("creates a copy with fileHash null and name suffixed (copy)", async () => {
-    mockPrisma.cvVersion.findFirst.mockResolvedValue(original)
-    mockPrisma.cvVersion.create.mockResolvedValue({ id: "cv-2" })
-    const r = await duplicateCvVersion({ id: "cv-1" })
-    expect(r.error).toBeNull()
-    expect(mockPrisma.cvVersion.create).toHaveBeenCalledWith({
-      data: {
-        userId: "user-1",
-        name: "Senior CV (copy)",
-        s3Key: VALID_BLOB_URL,
-        fileSize: 1024,
-        fileHash: null,
-      },
-    })
-  })
-})
-
 describe("restoreCvVersion", () => {
   const original = {
     id: "cv-1",
@@ -310,6 +262,7 @@ describe("restoreCvVersion", () => {
     s3Key: VALID_BLOB_URL,
     fileSize: 1024,
     fileHash: VALID_HASH,
+    uploadedAt: new Date("2026-05-01T00:00:00Z"),
   }
 
   it("rejects unauthenticated", async () => {
@@ -324,8 +277,20 @@ describe("restoreCvVersion", () => {
     expect(r).toEqual({ data: null, error: "Not found" })
   })
 
+  it("rejects when called on the already-active version", async () => {
+    mockPrisma.cvVersion.findFirst.mockResolvedValue(original)
+    mockPrisma.cvVersion.count.mockResolvedValue(0) // no newer versions exist
+    const r = await restoreCvVersion({ id: "cv-1" })
+    expect(r).toEqual({
+      data: null,
+      error: "This CV is already the active version.",
+    })
+    expect(mockPrisma.cvVersion.create).not.toHaveBeenCalled()
+  })
+
   it("returns cap error when limit is reached", async () => {
     mockPrisma.cvVersion.findFirst.mockResolvedValue(original)
+    mockPrisma.cvVersion.count.mockResolvedValue(2) // newer versions exist, so this isn't active
     mockCheckCap.mockResolvedValue({ allowed: false, count: 5, cap: 5, isPro: false })
     const r = await restoreCvVersion({ id: "cv-1" })
     expect(r.error).toContain("CV version limit reached")
@@ -334,6 +299,7 @@ describe("restoreCvVersion", () => {
 
   it("creates a new entry with same name and fileHash null", async () => {
     mockPrisma.cvVersion.findFirst.mockResolvedValue(original)
+    mockPrisma.cvVersion.count.mockResolvedValue(2)
     mockPrisma.cvVersion.create.mockResolvedValue({ id: "cv-3" })
     const r = await restoreCvVersion({ id: "cv-1" })
     expect(r.error).toBeNull()

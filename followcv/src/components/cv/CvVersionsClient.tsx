@@ -11,7 +11,6 @@ import { CvPreview } from "./CvPreview"
 import { formatFileSize } from "./formatFileSize"
 import {
   renameCvVersion,
-  duplicateCvVersion,
   restoreCvVersion,
   deleteCvVersion,
 } from "@/actions/manage-cv"
@@ -61,15 +60,6 @@ export function CvVersionsClient({ versions, cap }: Props) {
       router.refresh()
     }
     return result.error ? oldName : newName
-  }
-
-  async function handleDuplicate(id: string) {
-    const result = await duplicateCvVersion({ id })
-    if (result.error) {
-      setToast(result.error)
-    } else {
-      router.refresh()
-    }
   }
 
   async function handleRestore(id: string) {
@@ -140,7 +130,6 @@ export function CvVersionsClient({ versions, cap }: Props) {
                 handleRename(cv.id, newName, getDisplayName(cv.id, cv.name))
               }
               onEditCancel={() => setEditingId(null)}
-              onDuplicate={() => handleDuplicate(cv.id)}
               onRestore={() => handleRestore(cv.id)}
               onDeleteRequest={() => setPendingDeleteId(cv.id)}
               onDeleteConfirm={() => handleDelete(cv.id)}
@@ -166,7 +155,6 @@ type CvCardProps = {
   onEditStart: () => void
   onRename: (newName: string) => void
   onEditCancel: () => void
-  onDuplicate: () => void
   onRestore: () => void
   onDeleteRequest: () => void
   onDeleteConfirm: () => void
@@ -181,7 +169,6 @@ function CvCard({
   onEditStart,
   onRename,
   onEditCancel,
-  onDuplicate,
   onRestore,
   onDeleteRequest,
   onDeleteConfirm,
@@ -275,7 +262,6 @@ function CvCard({
               <CardActionsMenu
                 isActive={isActive}
                 onRename={onEditStart}
-                onDuplicate={onDuplicate}
                 onRestore={onRestore}
                 onDelete={onDeleteRequest}
               />
@@ -319,7 +305,6 @@ function DeleteConfirmRow({
 type CardActionsMenuProps = {
   isActive: boolean
   onRename: () => void
-  onDuplicate: () => void
   onRestore: () => void
   onDelete: () => void
 }
@@ -327,7 +312,6 @@ type CardActionsMenuProps = {
 function CardActionsMenu({
   isActive,
   onRename,
-  onDuplicate,
   onRestore,
   onDelete,
 }: CardActionsMenuProps) {
@@ -355,18 +339,12 @@ function CardActionsMenu({
             >
               Rename
             </Menu.Item>
-            <Menu.Item
-              onClick={onDuplicate}
-              className="flex cursor-pointer items-center px-3 py-1.5 outline-none data-[highlighted]:bg-slate-100"
-            >
-              Duplicate
-            </Menu.Item>
             {!isActive && (
               <Menu.Item
                 onClick={onRestore}
                 className="flex cursor-pointer items-center px-3 py-1.5 outline-none data-[highlighted]:bg-slate-100"
               >
-                Restore
+                Use as current
               </Menu.Item>
             )}
             <Menu.Item

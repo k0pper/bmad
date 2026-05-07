@@ -110,37 +110,6 @@ export async function renameCvVersion(input: {
   return { data: { id: cv.id, name: trimmed }, error: null }
 }
 
-export async function duplicateCvVersion(input: {
-  id: string
-}): Promise<ActionResult<{ cvVersion: CvVersion }>> {
-  const session = await requireUser()
-  if (!session.ok) return { data: null, error: session.error }
-
-  const original = await prisma.cvVersion.findFirst({
-    where: { id: input.id, userId: session.userId },
-  })
-  if (!original) return { data: null, error: "Not found" }
-
-  const cap = await checkCvVersionCap(session.userId)
-  if (!cap.allowed) {
-    return {
-      data: null,
-      error: "CV version limit reached — upgrade to Pro for unlimited versions",
-    }
-  }
-
-  const cvVersion = await prisma.cvVersion.create({
-    data: {
-      userId: session.userId,
-      name: `${original.name} (copy)`,
-      s3Key: original.s3Key,
-      fileSize: original.fileSize,
-      fileHash: null,
-    },
-  })
-  return { data: { cvVersion }, error: null }
-}
-
 export async function restoreCvVersion(input: {
   id: string
 }): Promise<ActionResult<{ cvVersion: CvVersion }>> {
@@ -151,6 +120,14 @@ export async function restoreCvVersion(input: {
     where: { id: input.id, userId: session.userId },
   })
   if (!original) return { data: null, error: "Not found" }
+
+  // Restore = "use this version as current". A no-op if it's already current.
+  const newer = await prisma.cvVersion.count({
+    where: { userId: session.userId, uploadedAt: { gt: original.uploadedAt } },
+  })
+  if (newer === 0) {
+    return { data: null, error: "This CV is already the active version." }
+  }
 
   const cap = await checkCvVersionCap(session.userId)
   if (!cap.allowed) {
