@@ -18,11 +18,23 @@ import { prisma } from "@/lib/db"
  * `CvVersion` row.
  */
 export async function deleteAccount(userId: string) {
-  const cvVersions = await prisma.cvVersion.findMany({
-    where: { userId },
-    select: { s3Key: true },
-  })
-  const blobUrls = cvVersions.map((cv) => cv.s3Key)
+  const [cvVersions, snapshots] = await Promise.all([
+    prisma.cvVersion.findMany({
+      where: { userId },
+      select: { s3Key: true },
+    }),
+    // CvSnapshot has no userId column — access is scoped via the
+    // Application relation. Story 3.3 onwards the user can own snapshots
+    // through their applications, and those blobs need cleaning up too.
+    prisma.cvSnapshot.findMany({
+      where: { application: { userId } },
+      select: { s3Key: true },
+    }),
+  ])
+  const blobUrls = [
+    ...cvVersions.map((cv) => cv.s3Key),
+    ...snapshots.map((s) => s.s3Key),
+  ]
 
   if (blobUrls.length > 0) {
     try {

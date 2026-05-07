@@ -5,6 +5,7 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     user: { delete: vi.fn() },
     cvVersion: { findMany: vi.fn() },
+    cvSnapshot: { findMany: vi.fn() },
     gmailToken: {
       findFirst: vi.fn(),
       delete: vi.fn(),
@@ -19,6 +20,7 @@ import { prisma } from "@/lib/db"
 type MockPrisma = {
   user: { delete: ReturnType<typeof vi.fn> }
   cvVersion: { findMany: ReturnType<typeof vi.fn> }
+  cvSnapshot: { findMany: ReturnType<typeof vi.fn> }
   gmailToken: {
     findFirst: ReturnType<typeof vi.fn>
     delete: ReturnType<typeof vi.fn>
@@ -28,12 +30,15 @@ type MockPrisma = {
 const mock = prisma as unknown as MockPrisma
 const mockUserDelete = vi.mocked(mock.user.delete)
 const mockCvFindMany = vi.mocked(mock.cvVersion.findMany)
+const mockSnapshotFindMany = vi.mocked(mock.cvSnapshot.findMany)
 const mockGmailFindFirst = vi.mocked(mock.gmailToken.findFirst)
 const mockGmailDelete = vi.mocked(mock.gmailToken.delete)
 const mockDel = del as unknown as ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Default: no snapshots — most tests don't care.
+  mockSnapshotFindMany.mockResolvedValue([])
 })
 
 describe("deleteAccount", () => {
@@ -57,6 +62,29 @@ describe("deleteAccount", () => {
     ])
     expect(mockUserDelete).toHaveBeenCalledWith({ where: { id: "user-1" } })
     expect(result).toEqual(deleted)
+  })
+
+  it("also deletes CvSnapshot blobs scoped via Application", async () => {
+    mockCvFindMany.mockResolvedValue([
+      { s3Key: "https://abc.private.blob.vercel-storage.com/cv-1.pdf" },
+    ])
+    mockSnapshotFindMany.mockResolvedValue([
+      { s3Key: "https://abc.private.blob.vercel-storage.com/snap-1.pdf" },
+      { s3Key: "https://abc.private.blob.vercel-storage.com/snap-2.pdf" },
+    ])
+    mockUserDelete.mockResolvedValue({ id: "user-1" })
+
+    await deleteAccount("user-1")
+
+    expect(mockSnapshotFindMany).toHaveBeenCalledWith({
+      where: { application: { userId: "user-1" } },
+      select: { s3Key: true },
+    })
+    expect(mockDel).toHaveBeenCalledWith([
+      "https://abc.private.blob.vercel-storage.com/cv-1.pdf",
+      "https://abc.private.blob.vercel-storage.com/snap-1.pdf",
+      "https://abc.private.blob.vercel-storage.com/snap-2.pdf",
+    ])
   })
 
   it("skips the blob delete call when the user has no CVs", async () => {
