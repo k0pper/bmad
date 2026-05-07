@@ -174,7 +174,9 @@ model CvVersion {
   fileSize   Int
   // Hex-encoded SHA-256 of the uploaded file. Combined with userId in a
   // unique index so the same file is never stored twice for the same user.
-  fileHash   String
+  // NULL for derived records (duplicates, restores) — Postgres treats each
+  // NULL as distinct so multiple nullable rows don't conflict.
+  fileHash   String?
   uploadedAt DateTime @default(now())
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
