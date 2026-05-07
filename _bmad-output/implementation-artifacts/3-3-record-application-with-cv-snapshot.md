@@ -1,6 +1,6 @@
 # Story 3.3: Record Application with CV Snapshot
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -284,16 +284,40 @@ If any of these don't match your intent, flag before kicking off implementation:
 
 ### Agent Model Used
 
-(to be filled by dev)
+claude-opus-4-7[1m]
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Schema cascade migration `20260507234839_cv_snapshot_cascade_from_cv_version` applied; `CvSnapshot.cvVersion` is now `ON DELETE CASCADE`.
+- `cv-snapshot-service.ts`: server-side blob copy via `get()` → `arrayBuffer()` → `put()`. UUID for the path component; caller uses the same value as the row id. Service does not write to DB.
+- `apply-to-job.ts`: full sequenced action with explicit cleanup paths (orphan blob + orphan snapshot row). Validates ownership, archived state, and "already applied"; checks CV version ownership; copies blob; creates snapshot row; creates application row; recomputes vitality. Returns only `{ applicationId, vitalityState }` — no `s3Key` leakage.
+- UI: centred Base UI Dialog (`ApplyRitualDialog`) reuses the existing `Dropdown` for `CVVersionSelector`. Empty-state path when the user has no CV versions. Toast copy matches UX spec.
+- Board integration: page selects `application: { id }` per listing and the user's CvVersion[]. BoardRow shows inline `Apply` button (intercepts `<Link>` via `e.preventDefault()`/`e.stopPropagation()`) or a muted `Applied` indicator. One dialog instance at BoardClient level.
+- `deleteAccount()` extended to clean up `CvSnapshot.s3Key` blobs scoped via the Application relation.
+- Validations: 227 tests pass (14 new tests for this story across `apply-to-job`, `cv-snapshot-service`, `account/service`); `tsc --noEmit` clean; `eslint` clean; `next build` clean.
+
 ### File List
+
+- `followcv/prisma/schema.prisma` — modified (`CvSnapshot.cvVersion` now `onDelete: Cascade`)
+- `followcv/prisma/migrations/20260507234839_cv_snapshot_cascade_from_cv_version/migration.sql` — created
+- `followcv/src/lib/services/cv-snapshot-service.ts` — created
+- `followcv/src/lib/services/cv-snapshot-service.test.ts` — created
+- `followcv/src/actions/apply-to-job.ts` — created
+- `followcv/src/actions/apply-to-job.test.ts` — created
+- `followcv/src/components/application/ApplyRitualDialog.tsx` — created
+- `followcv/src/components/application/CVVersionSelector.tsx` — created
+- `followcv/src/app/(dashboard)/board/page.tsx` — modified (load `application` FK + `cvVersions`; pass into `BoardClient`)
+- `followcv/src/components/board/BoardClient.tsx` — modified (`BoardListing.applied`, `cvVersions` prop, dialog wiring)
+- `followcv/src/components/board/BoardClient.test.tsx` — modified (mock `ApplyRitualDialog`; `applied` default; `cvVersions={[]}`)
+- `followcv/src/components/board/BoardRow.tsx` — modified (Apply button / Applied indicator; click interception)
+- `followcv/src/lib/account/service.ts` — modified (collect snapshot blobs scoped via Application)
+- `followcv/src/lib/account/service.test.ts` — modified (snapshot cleanup tests)
 
 ## Change Log
 
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-05-08 | Story created from epics.md Story 3.3 | bmad-create-story (claude-opus-4-7) |
+| 2026-05-08 | All tasks implemented; 227 tests green; lint + types + build clean; status → done | claude-opus-4-7 |
