@@ -195,7 +195,7 @@ model CvSnapshot {
   snapshotAt  DateTime @default(now())
   createdAt   DateTime @default(now())
 
-  cvVersion   CvVersion    @relation(fields: [cvVersionId], references: [id])
+  cvVersion   CvVersion    @relation(fields: [cvVersionId], references: [id], onDelete: Cascade)
   application Application?
 
   @@map("cv_snapshots")
