@@ -3,6 +3,7 @@
 import { del } from "@vercel/blob"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { checkCvVersionCap } from "@/lib/services/entitlement-service"
 import type { CvVersion } from "@/generated/prisma/client"
 
 type ActionResult<T> = { data: T; error: null } | { data: null; error: string }
@@ -84,6 +85,124 @@ export async function listCvVersions(): Promise<ActionResult<CvVersion[]>> {
     orderBy: { uploadedAt: "desc" },
   })
   return { data: versions, error: null }
+}
+
+export async function renameCvVersion(input: {
+  id: string
+  name: string
+}): Promise<ActionResult<{ id: string; name: string }>> {
+  const session = await requireUser()
+  if (!session.ok) return { data: null, error: session.error }
+
+  const trimmed = input.name.trim()
+  if (!trimmed) return { data: null, error: "Name cannot be empty" }
+
+  const cv = await prisma.cvVersion.findFirst({
+    where: { id: input.id, userId: session.userId },
+    select: { id: true },
+  })
+  if (!cv) return { data: null, error: "Not found" }
+
+  await prisma.cvVersion.update({
+    where: { id: cv.id },
+    data: { name: trimmed },
+  })
+  return { data: { id: cv.id, name: trimmed }, error: null }
+}
+
+export async function duplicateCvVersion(input: {
+  id: string
+}): Promise<ActionResult<{ cvVersion: CvVersion }>> {
+  const session = await requireUser()
+  if (!session.ok) return { data: null, error: session.error }
+
+  const original = await prisma.cvVersion.findFirst({
+    where: { id: input.id, userId: session.userId },
+  })
+  if (!original) return { data: null, error: "Not found" }
+
+  const cap = await checkCvVersionCap(session.userId)
+  if (!cap.allowed) {
+    return {
+      data: null,
+      error: "CV version limit reached — upgrade to Pro for unlimited versions",
+    }
+  }
+
+  const cvVersion = await prisma.cvVersion.create({
+    data: {
+      userId: session.userId,
+      name: `${original.name} (copy)`,
+      s3Key: original.s3Key,
+      fileSize: original.fileSize,
+      fileHash: null,
+    },
+  })
+  return { data: { cvVersion }, error: null }
+}
+
+export async function restoreCvVersion(input: {
+  id: string
+}): Promise<ActionResult<{ cvVersion: CvVersion }>> {
+  const session = await requireUser()
+  if (!session.ok) return { data: null, error: session.error }
+
+  const original = await prisma.cvVersion.findFirst({
+    where: { id: input.id, userId: session.userId },
+  })
+  if (!original) return { data: null, error: "Not found" }
+
+  const cap = await checkCvVersionCap(session.userId)
+  if (!cap.allowed) {
+    return {
+      data: null,
+      error: "CV version limit reached — upgrade to Pro for unlimited versions",
+    }
+  }
+
+  const cvVersion = await prisma.cvVersion.create({
+    data: {
+      userId: session.userId,
+      name: original.name,
+      s3Key: original.s3Key,
+      fileSize: original.fileSize,
+      fileHash: null,
+    },
+  })
+  return { data: { cvVersion }, error: null }
+}
+
+export async function deleteCvVersion(input: {
+  id: string
+}): Promise<ActionResult<{ deleted: true }>> {
+  const session = await requireUser()
+  if (!session.ok) return { data: null, error: session.error }
+
+  const cv = await prisma.cvVersion.findFirst({
+    where: { id: input.id, userId: session.userId },
+    include: { snapshots: { take: 1 } },
+  })
+  if (!cv) return { data: null, error: "Not found" }
+
+  if (cv.snapshots.length > 0) {
+    return {
+      data: null,
+      error: "This CV is attached to an application and cannot be deleted.",
+    }
+  }
+
+  // Check if other versions share the same blob before we decide to clean it up.
+  const otherCount = await prisma.cvVersion.count({
+    where: { userId: session.userId, s3Key: cv.s3Key, id: { not: input.id } },
+  })
+
+  await prisma.cvVersion.delete({ where: { id: cv.id } })
+
+  if (otherCount === 0) {
+    await safeDelBlob(cv.s3Key)
+  }
+
+  return { data: { deleted: true }, error: null }
 }
 
 function isUniqueViolation(err: unknown): boolean {
