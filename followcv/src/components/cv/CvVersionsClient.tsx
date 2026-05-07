@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Download, FileText, MoreHorizontal } from "lucide-react"
 import { Menu } from "@base-ui/react/menu"
@@ -20,6 +20,7 @@ type CvVersionRow = {
   name: string
   fileSize: number
   uploadedAt: Date
+  hasSnapshots: boolean
 }
 
 type CapInfo = {
@@ -39,45 +40,65 @@ export function CvVersionsClient({ versions, cap }: Props) {
   const [nameOverrides, setNameOverrides] = useState<Record<string, string>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [renameErrors, setRenameErrors] = useState<Record<string, string>>({})
+  const [restorePendingId, setRestorePendingId] = useState<string | null>(null)
+  const [deleteInFlight, setDeleteInFlight] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
   function getDisplayName(id: string, fallback: string) {
     return nameOverrides[id] ?? fallback
   }
 
+  function clearRenameError(id: string) {
+    setRenameErrors((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
+
   async function handleRename(id: string, newName: string, oldName: string) {
     setNameOverrides((prev) => ({ ...prev, [id]: newName }))
+    clearRenameError(id)
     setEditingId(null)
     const result = await renameCvVersion({ id, name: newName })
     if (result.error) {
-      setNameOverrides((prev) => {
-        const next = { ...prev }
-        delete next[id]
-        return next
-      })
-      setToast(result.error)
+      setNameOverrides((prev) => ({ ...prev, [id]: oldName }))
+      setRenameErrors((prev) => ({ ...prev, [id]: result.error! }))
     } else {
       router.refresh()
     }
-    return result.error ? oldName : newName
   }
 
   async function handleRestore(id: string) {
-    const result = await restoreCvVersion({ id })
-    if (result.error) {
-      setToast(result.error)
-    } else {
-      router.refresh()
+    if (restorePendingId) return
+    setRestorePendingId(id)
+    try {
+      const result = await restoreCvVersion({ id })
+      if (result.error) {
+        setToast(result.error)
+      } else {
+        router.refresh()
+      }
+    } finally {
+      setRestorePendingId(null)
     }
   }
 
   async function handleDelete(id: string) {
-    const result = await deleteCvVersion({ id })
-    setPendingDeleteId(null)
-    if (result.error) {
-      setToast(result.error)
-    } else {
-      router.refresh()
+    if (deleteInFlight) return
+    setDeleteInFlight(true)
+    try {
+      const result = await deleteCvVersion({ id })
+      setPendingDeleteId(null)
+      if (result.error) {
+        setToast(result.error)
+      } else {
+        router.refresh()
+      }
+    } finally {
+      setDeleteInFlight(false)
     }
   }
 
@@ -125,7 +146,13 @@ export function CvVersionsClient({ versions, cap }: Props) {
               isActive={index === 0}
               isEditing={editingId === cv.id}
               isPendingDelete={pendingDeleteId === cv.id}
-              onEditStart={() => setEditingId(cv.id)}
+              renameError={renameErrors[cv.id] ?? null}
+              restorePending={restorePendingId === cv.id}
+              deleteInFlight={deleteInFlight && pendingDeleteId === cv.id}
+              onEditStart={() => {
+                clearRenameError(cv.id)
+                setEditingId(cv.id)
+              }}
               onRename={(newName) =>
                 handleRename(cv.id, newName, getDisplayName(cv.id, cv.name))
               }
@@ -152,6 +179,9 @@ type CvCardProps = {
   isActive: boolean
   isEditing: boolean
   isPendingDelete: boolean
+  renameError: string | null
+  restorePending: boolean
+  deleteInFlight: boolean
   onEditStart: () => void
   onRename: (newName: string) => void
   onEditCancel: () => void
@@ -166,6 +196,9 @@ function CvCard({
   isActive,
   isEditing,
   isPendingDelete,
+  renameError,
+  restorePending,
+  deleteInFlight,
   onEditStart,
   onRename,
   onEditCancel,
@@ -174,7 +207,13 @@ function CvCard({
   onDeleteConfirm,
   onDeleteCancel,
 }: CvCardProps) {
-  const [editValue, setEditValue] = useState(cv.name)
+  const cardRef = useRef<HTMLLIElement>(null)
+
+  function focusTrigger() {
+    cardRef.current
+      ?.querySelector<HTMLButtonElement>('[aria-label="CV version actions"]')
+      ?.focus()
+  }
 
   const dateLabel = new Date(cv.uploadedAt).toLocaleDateString("en-US", {
     year: "numeric",
@@ -182,26 +221,9 @@ function CvCard({
     day: "numeric",
   })
 
-  function commitRename() {
-    const trimmed = editValue.trim()
-    if (!trimmed) {
-      onEditCancel()
-      return
-    }
-    onRename(trimmed)
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      commitRename()
-    } else if (e.key === "Escape") {
-      onEditCancel()
-    }
-  }
-
   return (
     <li
+      ref={cardRef}
       id={cv.id}
       className="group flex flex-col overflow-hidden rounded-lg border border-border bg-background transition-shadow duration-150 hover:shadow-md"
     >
@@ -222,14 +244,16 @@ function CvCard({
       <div className="flex flex-col border-t border-border p-3 gap-2">
         {/* Name row — editable or static */}
         {isEditing ? (
-          <input
-            className="w-full rounded border border-brand px-2 py-0.5 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/40"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={commitRename}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            aria-label="Rename CV version"
+          <RenameInput
+            initialName={cv.name}
+            cardId={cv.id}
+            renameError={renameError}
+            onCommit={onRename}
+            onCancel={() => {
+              onEditCancel()
+              focusTrigger()
+            }}
+            onCommitFinish={focusTrigger}
           />
         ) : (
           <p
@@ -239,13 +263,30 @@ function CvCard({
             {cv.name}
           </p>
         )}
+        {renameError && (
+          <p
+            id={`${cv.id}-rename-error`}
+            role="alert"
+            className="text-xs"
+            style={{ color: "var(--color-danger, #dc2626)" }}
+          >
+            {renameError}
+          </p>
+        )}
         <p className="text-xs text-text-tertiary">
           {dateLabel} · {formatFileSize(cv.fileSize)}
         </p>
 
         {/* Footer actions */}
         {isPendingDelete ? (
-          <DeleteConfirmRow onConfirm={onDeleteConfirm} onCancel={onDeleteCancel} />
+          <DeleteConfirmRow
+            inFlight={deleteInFlight}
+            onConfirm={onDeleteConfirm}
+            onCancel={() => {
+              onDeleteCancel()
+              focusTrigger()
+            }}
+          />
         ) : (
           <div className="flex items-center gap-1">
             <a
@@ -261,6 +302,8 @@ function CvCard({
             <div className="ml-auto">
               <CardActionsMenu
                 isActive={isActive}
+                hasSnapshots={cv.hasSnapshots}
+                restorePending={restorePending}
                 onRename={onEditStart}
                 onRestore={onRestore}
                 onDelete={onDeleteRequest}
@@ -273,10 +316,68 @@ function CvCard({
   )
 }
 
+function RenameInput({
+  initialName,
+  cardId,
+  renameError,
+  onCommit,
+  onCancel,
+  onCommitFinish,
+}: {
+  initialName: string
+  cardId: string
+  renameError: string | null
+  onCommit: (newName: string) => void
+  onCancel: () => void
+  onCommitFinish: () => void
+}) {
+  const [value, setValue] = useState(initialName)
+  // Guard against double-fire when Enter triggers commit and a follow-up blur
+  // (or programmatic focus loss) re-enters before the input unmounts.
+  const submittedRef = useRef(false)
+
+  function commit() {
+    if (submittedRef.current) return
+    const trimmed = value.trim()
+    if (!trimmed || trimmed === initialName) {
+      onCancel()
+      return
+    }
+    submittedRef.current = true
+    onCommit(trimmed)
+    onCommitFinish()
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      commit()
+    } else if (e.key === "Escape") {
+      onCancel()
+    }
+  }
+
+  return (
+    <input
+      className="w-full rounded border border-brand px-2 py-0.5 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/40"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={handleKeyDown}
+      autoFocus
+      aria-label="Rename CV version"
+      aria-invalid={renameError ? "true" : undefined}
+      aria-describedby={renameError ? `${cardId}-rename-error` : undefined}
+    />
+  )
+}
+
 function DeleteConfirmRow({
+  inFlight,
   onConfirm,
   onCancel,
 }: {
+  inFlight: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -286,15 +387,17 @@ function DeleteConfirmRow({
       <button
         type="button"
         onClick={onConfirm}
-        className="rounded px-2 py-0.5 text-[0.8rem] font-medium text-white transition-colors"
+        disabled={inFlight}
+        className="rounded px-2 py-0.5 text-[0.8rem] font-medium text-white transition-colors disabled:opacity-60"
         style={{ backgroundColor: "var(--color-danger, #dc2626)" }}
       >
-        Delete
+        {inFlight ? "Deleting…" : "Delete"}
       </button>
       <button
         type="button"
         onClick={onCancel}
-        className="rounded px-2 py-0.5 text-[0.8rem] font-medium text-text-secondary transition-colors hover:bg-muted"
+        disabled={inFlight}
+        className="rounded px-2 py-0.5 text-[0.8rem] font-medium text-text-secondary transition-colors hover:bg-muted disabled:opacity-60"
       >
         Cancel
       </button>
@@ -304,6 +407,8 @@ function DeleteConfirmRow({
 
 type CardActionsMenuProps = {
   isActive: boolean
+  hasSnapshots: boolean
+  restorePending: boolean
   onRename: () => void
   onRestore: () => void
   onDelete: () => void
@@ -311,10 +416,17 @@ type CardActionsMenuProps = {
 
 function CardActionsMenu({
   isActive,
+  hasSnapshots,
+  restorePending,
   onRename,
   onRestore,
   onDelete,
 }: CardActionsMenuProps) {
+  const itemBase =
+    "flex items-center px-3 py-1.5 outline-none data-[highlighted]:bg-slate-100"
+  const itemEnabled = "cursor-pointer"
+  const itemDisabled = "cursor-not-allowed opacity-50"
+
   return (
     <Menu.Root>
       <Menu.Trigger
@@ -335,21 +447,28 @@ function CardActionsMenu({
           >
             <Menu.Item
               onClick={onRename}
-              className="flex cursor-pointer items-center px-3 py-1.5 outline-none data-[highlighted]:bg-slate-100"
+              className={`${itemBase} ${itemEnabled}`}
             >
               Rename
             </Menu.Item>
             {!isActive && (
               <Menu.Item
-                onClick={onRestore}
-                className="flex cursor-pointer items-center px-3 py-1.5 outline-none data-[highlighted]:bg-slate-100"
+                onClick={restorePending ? undefined : onRestore}
+                disabled={restorePending}
+                className={`${itemBase} ${restorePending ? itemDisabled : itemEnabled}`}
               >
-                Use as current
+                {restorePending ? "Setting active…" : "Use as current"}
               </Menu.Item>
             )}
             <Menu.Item
-              onClick={onDelete}
-              className="flex cursor-pointer items-center px-3 py-1.5 outline-none data-[highlighted]:bg-slate-100"
+              onClick={hasSnapshots ? undefined : onDelete}
+              disabled={hasSnapshots}
+              title={
+                hasSnapshots
+                  ? "This CV is attached to an application and cannot be deleted."
+                  : undefined
+              }
+              className={`${itemBase} ${hasSnapshots ? itemDisabled : itemEnabled}`}
               style={{ color: "var(--color-danger, #dc2626)" }}
             >
               Delete
