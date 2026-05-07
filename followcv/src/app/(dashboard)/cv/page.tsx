@@ -8,7 +8,7 @@ export default async function CvPage() {
   const session = await auth()
   if (!session?.user?.id) redirect("/login")
 
-  const [versions, cap] = await Promise.all([
+  const [rows, cap] = await Promise.all([
     prisma.cvVersion.findMany({
       where: { userId: session.user.id },
       orderBy: { uploadedAt: "desc" },
@@ -17,10 +17,19 @@ export default async function CvPage() {
         name: true,
         fileSize: true,
         uploadedAt: true,
+        _count: { select: { snapshots: true } },
       },
     }),
     checkCvVersionCap(session.user.id),
   ])
+
+  const versions = rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    fileSize: row.fileSize,
+    uploadedAt: row.uploadedAt,
+    hasSnapshots: row._count.snapshots > 0,
+  }))
 
   return (
     <div className="mx-auto max-w-5xl p-8">

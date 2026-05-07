@@ -96,6 +96,9 @@ export async function renameCvVersion(input: {
 
   const trimmed = input.name.trim()
   if (!trimmed) return { data: null, error: "Name cannot be empty" }
+  if (trimmed.length > 200) {
+    return { data: null, error: "Name is too long (max 200 characters)" }
+  }
 
   const cv = await prisma.cvVersion.findFirst({
     where: { id: input.id, userId: session.userId },
@@ -112,12 +115,13 @@ export async function renameCvVersion(input: {
 
 export async function restoreCvVersion(input: {
   id: string
-}): Promise<ActionResult<{ cvVersion: CvVersion }>> {
+}): Promise<ActionResult<{ id: string }>> {
   const session = await requireUser()
   if (!session.ok) return { data: null, error: session.error }
 
   const original = await prisma.cvVersion.findFirst({
     where: { id: input.id, userId: session.userId },
+    select: { id: true, name: true, s3Key: true, fileSize: true, uploadedAt: true },
   })
   if (!original) return { data: null, error: "Not found" }
 
@@ -137,7 +141,7 @@ export async function restoreCvVersion(input: {
     }
   }
 
-  const cvVersion = await prisma.cvVersion.create({
+  const created = await prisma.cvVersion.create({
     data: {
       userId: session.userId,
       name: original.name,
@@ -145,8 +149,9 @@ export async function restoreCvVersion(input: {
       fileSize: original.fileSize,
       fileHash: null,
     },
+    select: { id: true },
   })
-  return { data: { cvVersion }, error: null }
+  return { data: { id: created.id }, error: null }
 }
 
 export async function deleteCvVersion(input: {

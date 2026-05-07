@@ -242,6 +242,12 @@ describe("renameCvVersion", () => {
     expect(mockPrisma.cvVersion.findFirst).not.toHaveBeenCalled()
   })
 
+  it("rejects names over 200 characters", async () => {
+    const r = await renameCvVersion({ id: "cv-1", name: "x".repeat(201) })
+    expect(r).toEqual({ data: null, error: "Name is too long (max 200 characters)" })
+    expect(mockPrisma.cvVersion.findFirst).not.toHaveBeenCalled()
+  })
+
   it("updates the name on happy path", async () => {
     mockPrisma.cvVersion.findFirst.mockResolvedValue({ id: "cv-1" })
     mockPrisma.cvVersion.update.mockResolvedValue({ id: "cv-1", name: "Updated" })
@@ -297,12 +303,12 @@ describe("restoreCvVersion", () => {
     expect(mockPrisma.cvVersion.create).not.toHaveBeenCalled()
   })
 
-  it("creates a new entry with same name and fileHash null", async () => {
+  it("creates a new entry with same name and fileHash null, returns only the id", async () => {
     mockPrisma.cvVersion.findFirst.mockResolvedValue(original)
     mockPrisma.cvVersion.count.mockResolvedValue(2)
     mockPrisma.cvVersion.create.mockResolvedValue({ id: "cv-3" })
     const r = await restoreCvVersion({ id: "cv-1" })
-    expect(r.error).toBeNull()
+    expect(r).toEqual({ data: { id: "cv-3" }, error: null })
     expect(mockPrisma.cvVersion.create).toHaveBeenCalledWith({
       data: {
         userId: "user-1",
@@ -311,6 +317,7 @@ describe("restoreCvVersion", () => {
         fileSize: 1024,
         fileHash: null,
       },
+      select: { id: true },
     })
   })
 })
