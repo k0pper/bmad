@@ -1,6 +1,6 @@
 # Story 3.2: CV Version Management
 
-Status: review
+Status: done
 
 ## Story
 
