@@ -7,6 +7,8 @@ import { ImportDrawer } from "./ImportDrawer"
 import { BoardRow } from "./BoardRow"
 import { FilterChipBar } from "./FilterChipBar"
 import { Button } from "@/components/ui/button"
+import { ApplyRitualDialog } from "@/components/application/ApplyRitualDialog"
+import type { CvVersionForSelector } from "@/components/application/CVVersionSelector"
 import {
   applyBoardFilters,
   countByVitalityState,
@@ -36,16 +38,20 @@ export type BoardListing = {
   notes: string | null
   closingDate: Date | null
   isRecent: boolean
+  applied: boolean
 }
 
 export function BoardClient({
   listings,
+  cvVersions,
   showArchived = false,
 }: {
   listings: BoardListing[]
+  cvVersions: CvVersionForSelector[]
   showArchived?: boolean
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [applyTargetId, setApplyTargetId] = useState<string | null>(null)
   const filters = useBoardFilters()
 
   const counts = useMemo(() => countByVitalityState(listings), [listings])
@@ -132,14 +138,32 @@ export function BoardClient({
               salaryMax={listing.salaryMax}
               salaryCurrency={listing.salaryCurrency}
               archived={listing.archived}
+              applied={listing.applied}
               isRecent={listing.isRecent}
               rowIndex={index}
+              onApplyClick={
+                showArchived || listing.archived
+                  ? undefined
+                  : () => setApplyTargetId(listing.id)
+              }
             />
           ))}
         </div>
       )}
 
       <ImportDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+      <ApplyRitualDialog
+        open={applyTargetId !== null}
+        onOpenChange={(next) => {
+          if (!next) setApplyTargetId(null)
+        }}
+        listing={
+          applyTargetId
+            ? listings.find((l) => l.id === applyTargetId) ?? null
+            : null
+        }
+        versions={cvVersions}
+      />
     </>
   )
 }

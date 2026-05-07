@@ -30,6 +30,10 @@ vi.mock("./ImportDrawer", () => ({
   ImportDrawer: () => null,
 }))
 
+vi.mock("@/components/application/ApplyRitualDialog", () => ({
+  ApplyRitualDialog: () => null,
+}))
+
 function makeListing(
   id: string,
   overrides: Partial<BoardListing> & { vitalityState: VitalityState; createdAt: Date }
@@ -51,6 +55,7 @@ function makeListing(
     notes: overrides.notes ?? null,
     closingDate: overrides.closingDate ?? null,
     isRecent: overrides.isRecent ?? false,
+    applied: overrides.applied ?? false,
   }
 }
 
@@ -64,7 +69,7 @@ describe("BoardClient — filter pipeline integration", () => {
       makeListing("a", { vitalityState: "HOT", createdAt: new Date("2026-01-01") }),
       makeListing("b", { vitalityState: "COOLING", createdAt: new Date("2026-01-02") }),
     ]
-    render(<BoardClient listings={listings} />)
+    render(<BoardClient listings={listings} cvVersions={[]} />)
     expect(screen.getAllByTestId("board-row")).toHaveLength(2)
   })
 
@@ -75,7 +80,7 @@ describe("BoardClient — filter pipeline integration", () => {
       makeListing("b", { vitalityState: "COOLING", createdAt: new Date("2026-01-02") }),
       makeListing("c", { vitalityState: "COOLING", createdAt: new Date("2026-01-03") }),
     ]
-    render(<BoardClient listings={listings} />)
+    render(<BoardClient listings={listings} cvVersions={[]} />)
 
     await user.click(screen.getByRole("button", { name: /Cooling/ }))
 
@@ -104,7 +109,7 @@ describe("BoardClient — filter pipeline integration", () => {
         createdAt: new Date("2026-01-02"),
       }),
     ]
-    render(<BoardClient listings={listings} />)
+    render(<BoardClient listings={listings} cvVersions={[]} />)
 
     await user.type(
       screen.getByRole("searchbox", { name: /search listings/i }),
@@ -121,7 +126,7 @@ describe("BoardClient — filter pipeline integration", () => {
     const listings = [
       makeListing("a", { vitalityState: "HOT", createdAt: new Date("2026-01-01") }),
     ]
-    render(<BoardClient listings={listings} />)
+    render(<BoardClient listings={listings} cvVersions={[]} />)
 
     await user.type(
       screen.getByRole("searchbox", { name: /search listings/i }),
@@ -146,7 +151,7 @@ describe("BoardClient — filter pipeline integration", () => {
       makeListing("a", { vitalityState: "HOT", createdAt: new Date("2026-01-01") }),
       makeListing("b", { vitalityState: "COOLING", createdAt: new Date("2026-01-02") }),
     ]
-    render(<BoardClient listings={listings} />)
+    render(<BoardClient listings={listings} cvVersions={[]} />)
 
     await user.click(screen.getByRole("button", { name: /Hot/ }))
     expect(screen.getAllByTestId("board-row")).toHaveLength(1)
@@ -162,7 +167,7 @@ describe("BoardClient — filter pipeline integration", () => {
   })
 
   it("does not show the chip bar when there are no listings at all", () => {
-    render(<BoardClient listings={[]} showArchived />)
+    render(<BoardClient listings={[]} cvVersions={[]} showArchived />)
     expect(screen.queryByRole("group", { name: /filter by vitality state/i })).not.toBeInTheDocument()
   })
 })

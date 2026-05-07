@@ -19,8 +19,16 @@ type BoardRowProps = {
   salaryMax: number | null
   salaryCurrency: string | null
   archived?: boolean
+  applied?: boolean
   isRecent?: boolean
   rowIndex?: number
+  /**
+   * Click handler for the inline Apply button. When undefined the button
+   * is hidden (e.g. archived listings, or when the parent doesn't want to
+   * surface the action). When the listing is already `applied`, an
+   * "Applied" indicator is shown instead and clicks are no-ops.
+   */
+  onApplyClick?: () => void
 }
 
 function formatSalary(min: number | null, max: number | null, currency: string | null): string | null {
@@ -56,8 +64,10 @@ export function BoardRow({
   salaryMax,
   salaryCurrency,
   archived = false,
+  applied = false,
   isRecent = false,
   rowIndex = 0,
+  onApplyClick,
 }: BoardRowProps) {
   const dateLabel = new Date(createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   const salary = formatSalary(salaryMin, salaryMax, salaryCurrency)
@@ -119,6 +129,32 @@ export function BoardRow({
       >
         {dateLabel}
       </span>
+
+      {/* Apply / Applied indicator */}
+      {applied ? (
+        <span
+          className="hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider sm:inline-block"
+          style={{
+            backgroundColor: "var(--color-vitality-active-bg)",
+            color: "var(--color-vitality-active-text)",
+          }}
+          title="You've applied to this listing"
+        >
+          Applied
+        </span>
+      ) : onApplyClick ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onApplyClick()
+          }}
+          className="hidden h-7 flex-shrink-0 items-center rounded-md px-2.5 text-xs font-medium text-text-secondary transition-colors duration-150 hover:bg-brand-subtle hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 sm:inline-flex"
+        >
+          Apply
+        </button>
+      ) : null}
 
       {/* Import source dot */}
       <div

@@ -13,6 +13,7 @@ function getBoardListings(userId: string, archived: boolean) {
   return prisma.jobListing.findMany({
     where: { userId, archived, deletedAt: null },
     orderBy: { createdAt: "desc" },
+    include: { application: { select: { id: true } } },
   })
 }
 
@@ -30,9 +31,14 @@ export default async function BoardPage({
   const params = await searchParams
   const showArchived = params.archived === "true"
 
-  const [listings, user] = await Promise.all([
+  const [listings, user, cvVersionsRaw] = await Promise.all([
     getBoardListings(session.user.id, showArchived),
     prisma.user.findUnique({ where: { id: session.user.id }, select: { lastVisitAt: true } }),
+    prisma.cvVersion.findMany({
+      where: { userId: session.user.id },
+      orderBy: { uploadedAt: "desc" },
+      select: { id: true, name: true, uploadedAt: true },
+    }),
   ])
 
   const previousVisitAt = user?.lastVisitAt ?? null
@@ -66,6 +72,7 @@ export default async function BoardPage({
     archived: listing.archived,
     notes: listing.notes,
     closingDate: listing.closingDate,
+    applied: listing.application !== null,
     isRecent:
       !showArchived &&
       listing.stateChangedAt !== null &&
@@ -74,10 +81,20 @@ export default async function BoardPage({
       nowMs - listing.stateChangedAt.getTime() < FORTY_EIGHT_HOURS_MS,
   }))
 
+  const cvVersions = cvVersionsRaw.map((v) => ({
+    id: v.id,
+    name: v.name,
+    uploadedAt: v.uploadedAt,
+  }))
+
   return (
     <div className="p-8">
       {hasStaleListings && <StalenessBanner />}
-      <BoardClient listings={boardListings} showArchived={showArchived} />
+      <BoardClient
+        listings={boardListings}
+        cvVersions={cvVersions}
+        showArchived={showArchived}
+      />
     </div>
   )
 }
