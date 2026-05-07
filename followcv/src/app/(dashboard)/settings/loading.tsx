@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 export default function SettingsLoading() {
   return (
-    <div className="mx-auto max-w-xl space-y-12 p-8">
+    <div className="mx-auto max-w-5xl space-y-12 p-8">
       {/* Profile section */}
       <section>
         <div className="mb-6 space-y-2">

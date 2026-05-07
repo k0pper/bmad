@@ -11,7 +11,7 @@ export default async function SettingsPage() {
   const profile = await getPreferenceProfile(session.user.id)
 
   return (
-    <div className="mx-auto max-w-xl p-8 space-y-12">
+    <div className="mx-auto max-w-5xl p-8 space-y-12">
       {/* Profile section */}
       <section aria-labelledby="profile-heading">
         <div className="mb-6">
