@@ -65,3 +65,10 @@ export async function revokeGmailToken(): Promise<SettingsActionState> {
 export async function skipOnboarding(): Promise<void> {
   redirect("/board")
 }
+
+export async function signOutAccount(): Promise<void> {
+  // Sign-out moved here from the sidebar UserMenu so it sits next to other
+  // account actions (manage subscription, Gmail, delete account). Lower
+  // chance of an accidental tap, and one place to find session controls.
+  await signOut({ redirectTo: "/login" })
+}

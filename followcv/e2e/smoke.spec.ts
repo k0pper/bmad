@@ -30,3 +30,17 @@ test("dashboard routes redirect unauthenticated users away", async ({ page }) =>
   await page.goto("/board")
   await expect(page).toHaveURL(/\/login/)
 })
+
+test("listing detail route redirects unauthenticated users away", async ({ page }) => {
+  // /board/[listingId] is gated by middleware too. The route must exist
+  // post-section-reorder; this catches accidental file/route deletions.
+  await page.goto("/board/some-fake-id")
+  await expect(page).toHaveURL(/\/login/)
+})
+
+test("settings route redirects unauthenticated users away", async ({ page }) => {
+  // After moving sign-out into /settings, that page must still be gated:
+  // no anonymous visitor should be able to land on the sign-out button.
+  await page.goto("/settings")
+  await expect(page).toHaveURL(/\/login/)
+})
