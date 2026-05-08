@@ -264,6 +264,33 @@
   }
 }
 
+/* --- Vitality "live" pulse ---------------------------------------- */
+/* A small dot inside the vitality badge that pulses while the state is
+   system-computed (live). Stops pulsing — replaced with a lock — when the
+   user has manually overridden the state. Lets the user tell at a glance
+   which listings are following the rules vs frozen by hand. */
+@keyframes vitalityLivePulse {
+  0%, 100% { transform: scale(1);   opacity: 0.95; }
+  50%      { transform: scale(1.6); opacity: 0.35; }
+}
+
+.vitality-live-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  animation: vitalityLivePulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vitality-live-dot {
+    animation: none;
+  }
+}
+
 /* --- Page transitions --------------------------------------------- */
 /* 150ms fade + tiny rise — applied via template.tsx so it replays on
    every route change. Disabled under prefers-reduced-motion. */
