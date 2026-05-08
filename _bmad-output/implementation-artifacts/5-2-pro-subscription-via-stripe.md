@@ -1,6 +1,6 @@
 # Story 5.2: Pro Subscription via Stripe
 
-Status: done (code) — **needs external configuration before it works**; see MORNING_NOTES.md.
+Status: done
 
 ## Story
 
@@ -95,3 +95,4 @@ The "over-cap free downgrade puts the board in read-only mode" piece of AC 6 is 
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-05-08 | Story implemented and shipped to main; Stripe configuration deferred to morning | claude-opus-4-7 |
+| 2026-05-08 | Stripe sandbox configured (Product, Price, API keys, webhook signing secret); upgrade + cancel flows smoke-tested end-to-end with test card `4242 4242 4242 4242`; webhook events relayed via `stripe listen`; user reviewed | alex |
