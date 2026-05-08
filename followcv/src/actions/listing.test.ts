@@ -328,7 +328,6 @@ describe("updateListing", () => {
         salaryMin: "100000",
         salaryMax: "150000",
         salaryCurrency: "EUR",
-        notes: "Strong fit",
       })
     )
 
@@ -346,8 +345,10 @@ describe("updateListing", () => {
       salaryMin: 100000,
       salaryMax: 150000,
       salaryCurrency: "EUR",
-      notes: "Strong fit",
     })
+    // Notes are owned by updateListingNotes (Story 3.4); updateListing
+    // must not touch the notes column.
+    expect(call.data.notes).toBeUndefined()
   })
 
   it("returns an error when no listing matches the user", async () => {

@@ -48,7 +48,6 @@ export const updateListingSchema = z
       .length(3)
       .optional()
       .transform((v) => (v === undefined || v === "" ? "USD" : v)),
-    notes: optionalString(5000),
     closingDate: optionalDate,
   })
   .refine(

@@ -13,7 +13,6 @@ type InitialValues = {
   salaryMin: number | null
   salaryMax: number | null
   salaryCurrency: string | null
-  notes: string | null
   closingDate: Date | null
 }
 
@@ -81,22 +80,6 @@ export function ListingEditForm({ listingId, initialValues }: Props) {
           defaultValue={toDateInput(initialValues.closingDate)}
         />
       </div>
-      <label className="block">
-        <span
-          className="block text-xs font-medium mb-1"
-          style={{ color: "var(--color-text-secondary)" }}
-        >
-          Notes
-        </span>
-        <textarea
-          name="notes"
-          defaultValue={initialValues.notes ?? ""}
-          rows={4}
-          className="w-full rounded-md border px-3 py-2 text-sm"
-          style={{ borderColor: "var(--color-border, #e2e8f0)" }}
-        />
-      </label>
-
       {error && (
         <p role="alert" className="text-sm" style={{ color: "var(--color-danger, #b91c1c)" }}>
           {error}

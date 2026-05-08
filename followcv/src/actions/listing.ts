@@ -250,7 +250,6 @@ export async function updateListing(
     salaryMin: formData.get("salaryMin") ?? undefined,
     salaryMax: formData.get("salaryMax") ?? undefined,
     salaryCurrency: formData.get("salaryCurrency") ?? undefined,
-    notes: formData.get("notes") ?? undefined,
     closingDate: formData.get("closingDate") ?? undefined,
   })
   if (!parsed.success) {
@@ -260,6 +259,9 @@ export async function updateListing(
   const ownedId = await findOwnedListingId(listingId, session.userId)
   if (!ownedId) return { data: null, error: "Listing not found" }
 
+  // Notes are owned by `updateListingNotes` (inline-on-blur editor); this
+  // action no longer touches the notes column to avoid clobbering inline
+  // edits with a stale form snapshot.
   await prisma.jobListing.update({
     where: { id: ownedId },
     data: {
@@ -269,7 +271,6 @@ export async function updateListing(
       salaryMin: parsed.data.salaryMin,
       salaryMax: parsed.data.salaryMax,
       salaryCurrency: parsed.data.salaryCurrency,
-      notes: parsed.data.notes,
       closingDate: parsed.data.closingDate,
     },
   })

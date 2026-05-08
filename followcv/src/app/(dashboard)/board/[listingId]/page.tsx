@@ -7,6 +7,9 @@ import { DetailAccordion } from "@/components/listing/DetailAccordion"
 import { VitalityExplanation } from "@/components/listing/VitalityExplanation"
 import { ListingEditForm } from "@/components/listing/ListingEditForm"
 import { ListingArchiveButton } from "@/components/listing/ListingArchiveButton"
+import { ApplicationStatusSelect } from "@/components/application/ApplicationStatusSelect"
+import { ListingNotesField } from "@/components/listing/ListingNotesField"
+import { ApplicationNotesField } from "@/components/application/ApplicationNotesField"
 import { explainVitalityState, computeVitalityState } from "@/lib/services/vitality-state-machine"
 import type { VitalityState, ApplicationStatus } from "@/generated/prisma/client"
 
@@ -89,37 +92,58 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
         />
       ),
     },
-    ...(listing.notes
-      ? [
-          {
-            id: "notes",
-            label: "Notes",
-            children: (
-              <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--color-text-secondary)" }}>
-                {listing.notes}
-              </p>
-            ),
-          },
-        ]
-      : []),
+    {
+      id: "notes",
+      label: "Notes",
+      children: (
+        <ListingNotesField
+          listingId={listing.id}
+          initialNotes={listing.notes}
+        />
+      ),
+    },
     {
       id: "application",
       label: "Application",
       children: listing.application ? (
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <dt style={{ color: "var(--color-text-secondary)" }}>Status</dt>
-          <dd style={{ color: "var(--color-text-primary)" }}>{listing.application.status}</dd>
-          <dt style={{ color: "var(--color-text-secondary)" }}>Applied</dt>
-          <dd style={{ color: "var(--color-text-primary)" }}>
-            {formatDate(new Date(listing.application.appliedAt))}
-          </dd>
-        </dl>
+        <div className="space-y-4 text-sm">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <dt style={{ color: "var(--color-text-secondary)" }}>Status</dt>
+            <dd>
+              <ApplicationStatusSelect
+                listingId={listing.id}
+                initialStatus={listing.application.status as ApplicationStatus}
+              />
+            </dd>
+            <dt style={{ color: "var(--color-text-secondary)" }}>Applied</dt>
+            <dd style={{ color: "var(--color-text-primary)" }}>
+              {formatDate(new Date(listing.application.appliedAt))}
+            </dd>
+          </dl>
+          <div>
+            <p
+              className="mb-1.5 text-xs font-medium"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              Application notes
+            </p>
+            <ApplicationNotesField
+              listingId={listing.id}
+              initialNotes={listing.application.notes}
+            />
+          </div>
+        </div>
       ) : (
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          No application recorded yet.{" "}
-          <span style={{ color: "var(--color-text-tertiary)" }}>
-            Apply action coming in a future update.
-          </span>
+          No application recorded yet. Use the{" "}
+          <Link
+            href="/board"
+            className="underline"
+            style={{ color: "var(--color-brand)" }}
+          >
+            Apply
+          </Link>{" "}
+          action on this listing&apos;s board row to record one.
         </p>
       ),
     },
@@ -136,7 +160,6 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             salaryMin: listing.salaryMin,
             salaryMax: listing.salaryMax,
             salaryCurrency: listing.salaryCurrency,
-            notes: listing.notes,
             closingDate: listing.closingDate,
           }}
         />
