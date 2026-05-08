@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { isJobBoardHost } from "@/lib/services/scraper-service"
 
 export const urlImportSchema = z.object({
   url: z.string().url("Please enter a valid URL"),
@@ -25,6 +26,12 @@ export const manualImportSchema = z.object({
   notes: z.string().optional(),
 })
 
+// Lightweight host validator — must look like at least `<label>.<tld>` with
+// no spaces or path-like characters. We don't try to be a full RFC-1035
+// validator; we just want to refuse free-text junk that the URL parser's
+// fallback path lets through (e.g. "/jobs/123", "hello world").
+const BARE_HOST_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i
+
 function normaliseDomain(input: string): string | undefined {
   const trimmed = input.trim()
   if (!trimmed) return undefined
@@ -33,13 +40,22 @@ function normaliseDomain(input: string): string | undefined {
   // case-insensitive but downstream code (vitality recompute, distinct-domain
   // grouping) compares strings exactly. Mixed-case storage causes
   // double-counting and missed matches.
+  let candidate: string | undefined
   try {
     const u = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`)
     const host = u.hostname.replace(/^www\./, "").toLowerCase()
-    return host || undefined
+    if (host) candidate = host
   } catch {
-    return trimmed.replace(/^www\./, "").toLowerCase()
+    candidate = trimmed.replace(/^www\./, "").toLowerCase()
   }
+  if (!candidate) return undefined
+  // Reject obvious junk (paths, free text, single-label hosts).
+  if (!BARE_HOST_RE.test(candidate)) return undefined
+  // Reject job-board hosts so a user pasting "stepstone.de" doesn't end up
+  // with the Gmail processor searching for messages from the job board
+  // itself instead of the actual employer.
+  if (isJobBoardHost(candidate)) return undefined
+  return candidate
 }
 
 export type ManualImportInput = z.infer<typeof manualImportSchema>

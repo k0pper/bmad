@@ -22,7 +22,7 @@ describe("handleGmailIngestSignals", () => {
   it("returns zero counts when no eligible users", async () => {
     mockedFindMany.mockResolvedValue([])
     const result = await handleGmailIngestSignals()
-    expect(result).toEqual({ users: 0, found: 0, revoked: 0, errors: [] })
+    expect(result).toEqual({ users: 0, found: 0, revoked: 0, domainErrors: 0, errors: [] })
     expect(mockedProcessor).not.toHaveBeenCalled()
   })
 
@@ -45,7 +45,7 @@ describe("handleGmailIngestSignals", () => {
       { id: "user-no-token" },
     ])
     mockedProcessor.mockImplementation(async (userId: string) => {
-      if (userId === "user-ok") return { status: "ok", checked: 2, found: 3 }
+      if (userId === "user-ok") return { status: "ok", checked: 2, found: 3, errors: 1 }
       if (userId === "user-revoked") return { status: "revoked", checked: 0, found: 0 }
       return { status: "no-token", checked: 0, found: 0 }
     })
@@ -56,6 +56,7 @@ describe("handleGmailIngestSignals", () => {
       users: 3,
       found: 3,
       revoked: 1,
+      domainErrors: 1,
       errors: [],
     })
     expect(mockedProcessor).toHaveBeenCalledTimes(3)

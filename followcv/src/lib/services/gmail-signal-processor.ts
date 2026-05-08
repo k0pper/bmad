@@ -141,7 +141,14 @@ export async function processGmailSignalsForUser(
   }
 
   // ── 5. Update the watermark ────────────────────────────────────────────
-  await setLastSignalCheckAt(userId, now)
+  // If every domain we tried failed, don't advance — odds are the failure
+  // is global (transient invalid token, Gmail outage) and advancing would
+  // permanently skip every signal that arrived during this window. The
+  // per-domain `try/catch` above is for the "company A 5xx, company B
+  // succeeds" case, not for "everything failed".
+  if (errors === 0 || errors < byDomain.size) {
+    await setLastSignalCheckAt(userId, now)
+  }
 
   return { status: "ok", checked: byDomain.size, found, errors }
 }

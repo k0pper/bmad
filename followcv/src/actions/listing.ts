@@ -80,14 +80,19 @@ export async function overrideVitality(
     },
   })
 
-  await writeAuditLog({
-    source: "USER_OVERRIDE",
-    userId: session.userId,
-    listingId,
-    previousState: snapshot.vitalityState,
-    newState,
-    computedAt: now,
-  })
+  // Only write the audit row when something actually changed — re-applying
+  // the same override is a UI no-op and shouldn't pollute the listing's
+  // history with phantom transition rows.
+  if (stateChanged) {
+    await writeAuditLog({
+      source: "USER_OVERRIDE",
+      userId: session.userId,
+      listingId,
+      previousState: snapshot.vitalityState,
+      newState,
+      computedAt: now,
+    })
+  }
 
   return { data: { snapshot }, error: null }
 }

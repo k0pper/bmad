@@ -97,9 +97,14 @@ export function VitalityBadge({
     />
   )
 
-  const badgeAriaLabel = `${label} — ${ariaContext}${
-    isOverridden ? " (manually set)" : showLiveIndicator ? " (live)" : ""
-  }`
+  // Only claim a status suffix when we render the matching visual
+  // indicator — otherwise sighted users wouldn't see what screen-reader
+  // users hear ("manually set" with no lock icon).
+  const badgeAriaLabel = !showLiveIndicator
+    ? `${label} — ${ariaContext}`
+    : `${label} — ${ariaContext}${
+        isOverridden ? " (manually set)" : " (live)"
+      }`
 
   return (
     <span

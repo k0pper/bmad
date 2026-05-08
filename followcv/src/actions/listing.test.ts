@@ -164,6 +164,20 @@ describe("overrideVitality", () => {
     expect(updateCall.data.stateChangedAt).toBeUndefined()
     expect(updateCall.data.lastComputedAt).toBeInstanceOf(Date)
   })
+
+  it("does NOT write a USER_OVERRIDE audit row when re-applying the same state", async () => {
+    // The audit log is the listing's history. A no-op override shouldn't
+    // appear there as a phantom transition with previousState===newState.
+    mockAuth.mockResolvedValue(validSession)
+    mockPrisma.jobListing.findFirst.mockResolvedValue({
+      ...baseListing,
+      vitalityState: "ACTIVE",
+    })
+
+    await overrideVitality("listing-1", "ACTIVE")
+
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled()
+  })
 })
 
 describe("clearVitalityOverride", () => {

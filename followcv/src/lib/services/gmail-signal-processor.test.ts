@@ -259,6 +259,45 @@ describe("processGmailSignalsForUser", () => {
     expect(headers.Authorization).toBe("Bearer ya29.SUPER")
   })
 
+  it("does NOT advance the watermark when every domain failed (likely global outage / bad token)", async () => {
+    // Per-domain isolation is for "company A 5xx, company B succeeds".
+    // When EVERY domain fails the same tick, the failure is almost
+    // certainly global (transient invalid token, Gmail outage). Holding
+    // the watermark lets the next tick re-process the same window so we
+    // don't permanently lose every signal that arrived during the failure.
+    mockedCheckpoint.mockResolvedValue({
+      lastSignalCheckAt: null,
+      createdAt: CONNECTED_AT,
+    })
+    mockedRefresh.mockResolvedValue({
+      status: "ok",
+      accessToken: "ya29.token",
+      expiresAt: new Date(NOW.getTime() + 3600_000),
+    })
+    mockedPrisma.jobListing.findMany.mockResolvedValue([
+      {
+        id: "listing-1",
+        companyDomain: "domA.com",
+        application: { appliedAt: APPLIED_AT },
+      },
+      {
+        id: "listing-2",
+        companyDomain: "domB.com",
+        application: { appliedAt: APPLIED_AT },
+      },
+    ])
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response("internal", { status: 500 }),
+    )
+
+    const result = await processGmailSignalsForUser("user-1", NOW)
+
+    expect(result).toEqual({ status: "ok", checked: 2, found: 0, errors: 2 })
+    // The whole point: watermark must NOT advance when every domain blew up.
+    expect(mockedSetWatermark).not.toHaveBeenCalled()
+    expect(mockedPrisma.auditLog.create).not.toHaveBeenCalled()
+  })
+
   it("isolates per-domain Gmail API failures: counts the error, advances watermark, and writes audits for healthy domains", async () => {
     // A 5xx (or any non-2xx) on one domain used to abort the whole user's
     // tick — leaving the watermark un-advanced and re-writing audit logs

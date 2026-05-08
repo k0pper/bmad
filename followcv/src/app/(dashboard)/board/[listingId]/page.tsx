@@ -85,10 +85,16 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       })
     } catch { /* non-critical */ }
     displayState = freshState
-  } else if (freshState !== null) {
+  } else if (
+    freshState !== null &&
+    (listing.lastComputedAt === null ||
+      now.getTime() - listing.lastComputedAt.getTime() > 60_000)
+  ) {
     // Even if the state didn't change, bump lastComputedAt so the board
     // page's "stale" indicator doesn't keep flagging this listing — we
-    // just verified it. No audit log: there was no transition to record.
+    // just verified it. The 60-second throttle stops a refresh storm /
+    // bot from rewriting the row on every GET. No audit log: there was
+    // no transition to record.
     await prisma.jobListing.update({
       where: { id: listing.id },
       data: { lastComputedAt: now },

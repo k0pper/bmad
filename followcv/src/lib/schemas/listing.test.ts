@@ -39,4 +39,33 @@ describe("listing schemas — companyDomain normalisation", () => {
     })
     expect(parsed.companyDomain).toBeNull()
   })
+
+  it("rejects job-board hosts a user pastes into the domain field", () => {
+    // The user-reported bug: typing/pasting "stepstone.de" into the
+    // companyDomain field would silently make Gmail signals search for
+    // emails from the job board. Schema-level deny-list closes the gap.
+    for (const board of ["stepstone.de", "https://www.stepstone.de", "linkedin.com/company/acme"]) {
+      const parsed = updateListingSchema.parse({
+        title: "Dev",
+        company: "Acme",
+        companyDomain: board,
+        salaryCurrency: "USD",
+      })
+      expect(parsed.companyDomain, `denied for ${board}`).toBeNull()
+    }
+  })
+
+  it("rejects path-only / free-text junk that the URL parser can't handle", () => {
+    // The catch path used to lower-case the raw input and store it
+    // verbatim — `"/jobs/123"` would become an unusable companyDomain.
+    for (const junk of ["/jobs/123", "hello world", "acme", "..."]) {
+      const parsed = updateListingSchema.parse({
+        title: "Dev",
+        company: "Acme",
+        companyDomain: junk,
+        salaryCurrency: "USD",
+      })
+      expect(parsed.companyDomain, `rejected for ${junk}`).toBeNull()
+    }
+  })
 })

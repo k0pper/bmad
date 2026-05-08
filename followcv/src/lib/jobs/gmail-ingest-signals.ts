@@ -15,6 +15,11 @@ export type GmailIngestSummary = {
   users: number
   found: number
   revoked: number
+  /** Sum of per-user, per-domain Gmail API failures observed during this
+   * tick. Distinct from `errors[]` (system-level per-user crashes) — these
+   * were swallowed inside the processor so the user's other domains could
+   * still be checked, but we surface the count for monitoring. */
+  domainErrors: number
   errors: { userId: string; error: string }[]
 }
 
@@ -31,12 +36,14 @@ export async function handleGmailIngestSignals(): Promise<GmailIngestSummary> {
 
   let found = 0
   let revoked = 0
+  let domainErrors = 0
   const errors: { userId: string; error: string }[] = []
 
   for (const { id: userId } of eligible) {
     try {
       const result = await processGmailSignalsForUser(userId, now)
       found += result.found
+      domainErrors += result.errors ?? 0
       if (result.status === "revoked") revoked++
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -45,5 +52,5 @@ export async function handleGmailIngestSignals(): Promise<GmailIngestSummary> {
     }
   }
 
-  return { users: eligible.length, found, revoked, errors }
+  return { users: eligible.length, found, revoked, domainErrors, errors }
 }

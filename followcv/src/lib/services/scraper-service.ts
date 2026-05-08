@@ -57,7 +57,7 @@ const JOB_BOARD_HOSTS = [
   "yourfirm.de",
 ] as const
 
-function isJobBoardHost(host: string): boolean {
+export function isJobBoardHost(host: string): boolean {
   const lower = host.toLowerCase()
   return JOB_BOARD_HOSTS.some(
     (jb) => lower === jb || lower.endsWith(`.${jb}`),
