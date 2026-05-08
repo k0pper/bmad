@@ -35,7 +35,16 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   const listing = await prisma.jobListing.findFirst({
     where: { id: listingId, userId: session.user.id, deletedAt: null },
     include: {
-      application: true,
+      application: {
+        include: {
+          cvSnapshot: {
+            select: {
+              id: true,
+              cvVersion: { select: { name: true } },
+            },
+          },
+        },
+      },
       auditLogs: { orderBy: { computedAt: "desc" }, take: 1 },
     },
   })
@@ -119,6 +128,40 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             <dd style={{ color: "var(--color-text-primary)" }}>
               {formatDate(new Date(listing.application.appliedAt))}
             </dd>
+            {listing.application.cvSnapshot && (
+              <>
+                <dt style={{ color: "var(--color-text-secondary)" }}>
+                  CV sent
+                </dt>
+                <dd style={{ color: "var(--color-text-primary)" }}>
+                  <span className="mr-2">
+                    {listing.application.cvSnapshot.cvVersion.name}
+                  </span>
+                  <a
+                    href={`/api/cv/snapshot/${listing.application.cvSnapshot.id}/file`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs underline"
+                    style={{ color: "var(--color-brand)" }}
+                  >
+                    View
+                  </a>
+                  <span
+                    className="mx-1.5"
+                    style={{ color: "var(--color-text-tertiary)" }}
+                  >
+                    ·
+                  </span>
+                  <a
+                    href={`/api/cv/snapshot/${listing.application.cvSnapshot.id}/file?download=1`}
+                    className="text-xs underline"
+                    style={{ color: "var(--color-brand)" }}
+                  >
+                    Download
+                  </a>
+                </dd>
+              </>
+            )}
           </dl>
           <div>
             <p
