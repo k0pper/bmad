@@ -265,29 +265,44 @@
 }
 
 /* --- Vitality "live" pulse ---------------------------------------- */
-/* A small dot inside the vitality badge that pulses while the state is
-   system-computed (live). Stops pulsing — replaced with a lock — when the
-   user has manually overridden the state. Lets the user tell at a glance
-   which listings are following the rules vs frozen by hand. */
-@keyframes vitalityLivePulse {
-  0%, 100% { transform: scale(1);   opacity: 0.95; }
-  50%      { transform: scale(1.6); opacity: 0.35; }
+/* A solid dot with an expanding "ping" halo that radiates outward, so
+   even at small badge sizes the motion is unmistakable on a board with
+   many rows. The ::before is the halo; the parent span is the steady
+   dot. Stops entirely (replaced with a lock icon) when the state is
+   user-overridden, and freezes — but stays visible — under
+   prefers-reduced-motion. */
+@keyframes vitalityLivePing {
+  0%   { transform: scale(1);   opacity: 0.75; }
+  80%  { transform: scale(2.4); opacity: 0;    }
+  100% { transform: scale(2.4); opacity: 0;    }
 }
 
 .vitality-live-dot {
   position: relative;
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 9999px;
   background-color: currentColor;
-  animation: vitalityLivePulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   flex-shrink: 0;
+  /* Slight lift so the dot reads as its own object, not as a period. */
+  margin-left: 1px;
+}
+
+.vitality-live-dot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-color: currentColor;
+  animation: vitalityLivePing 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vitality-live-dot {
+  .vitality-live-dot::before {
     animation: none;
+    opacity: 0;
   }
 }
 

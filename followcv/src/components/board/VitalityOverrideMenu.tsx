@@ -103,7 +103,18 @@ export function VitalityOverrideMenu({ listingId, currentState, overrideSource }
               {STATE_OPTIONS.map((opt) => (
                 <Menu.Item
                   key={opt.state}
-                  onClick={() => handleSelect(opt.state)}
+                  // Menu items render via Portal, so they're outside the
+                  // BoardRow's <Link> in the DOM, but React synthetic
+                  // events still bubble through the React component tree
+                  // back to the Link. Without preventDefault+stopPropagation
+                  // here, clicking an option both fires the action AND
+                  // navigates to /board/[listingId].
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleSelect(opt.state)
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="flex items-center gap-2 px-3 py-1.5 cursor-pointer data-[highlighted]:bg-slate-100 outline-none"
                 >
                   <VitalityBadge state={opt.state} showLiveIndicator={false} />
@@ -124,7 +135,12 @@ export function VitalityOverrideMenu({ listingId, currentState, overrideSource }
               />
               <Menu.Item
                 disabled={!isOverridden}
-                onClick={handleClear}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleClear()
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="px-3 py-1.5 cursor-pointer data-[highlighted]:bg-slate-100 data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed outline-none"
               >
                 Clear override
