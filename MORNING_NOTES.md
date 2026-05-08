@@ -71,6 +71,29 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, "updatedAt" = now();
 - **5.1 — Listing Cap Enforcement** ✅ (Pro short-circuit, ProGatePattern reusable component, 80%/90% banners)
 - **5.2 — Pro Subscription via Stripe** ✅ code-only — needs the configuration above to work end-to-end
 
+### Stripe webhook code review — what I patched and what I left
+
+After shipping Story 5.2 I ran an adversarial review of the Stripe code. **Patched in this session:**
+
+- ✅ **Webhook idempotency** — new `stripe_webhook_events` table; the route inserts `event.id` first and short-circuits on a unique-constraint conflict. Stripe retries are now safe.
+- ✅ **Customer-metadata fallback** for the race where `customer.subscription.updated` arrives before `checkout.session.completed`. The webhook now reads `userId` from `Customer.metadata` when our DB doesn't have the customerId mapping yet, and back-fills the column.
+- ✅ **Subscription metadata** — `createCheckoutSession` now stamps `userId` on the Subscription via `subscription_data.metadata`, giving every future `customer.subscription.*` event a userId without needing the customer-metadata round-trip.
+- ✅ **Wrong-subscription overwrite** — `customer.subscription.updated` only stamps `stripeSubscriptionId` when the subscription is active/trialing or matches the existing one. `customer.subscription.deleted` is also gated on matching ids so a stale `deleted` event for an old sub can't downgrade an active payer.
+- ✅ **Subscription id fallback** — if `checkout.session.completed` arrives without a string subscription id, we re-retrieve the session with `expand: ['subscription']`.
+- ✅ **Deleted-Customer recovery** — `createCheckoutSession` now `customers.retrieve` first; on `resource_missing` (or `deleted: true`), nulls the stale id and creates a fresh Customer.
+- ✅ **Settings page now prefers Stripe truth** — `/settings/subscription` reads `cancel_at_period_end` from Stripe directly and uses it over the local `subscriptionEndsAt` mirror, so a delayed webhook can't leave the UI stuck on "Cancels on…" after the user un-cancels via the customer portal.
+- ✅ **Webhook observability** — every event/handler path logs structured JSON (event.id, type, resolved-userId-or-null) via `console.log`/`console.error`. Critical for debugging silent skips.
+- ✅ **Runtime + dynamic exports** on the webhook route, so a future "let's go edge" PR can't silently break signature verification.
+- ✅ **`apiVersion` actually pinned** (was just a comment claim, no actual pin).
+
+**Left for you to weigh in on:**
+
+- ⚠️ **Out-of-order webhook delivery is still a residual risk.** Stripe doesn't guarantee event ordering. If `customer.subscription.updated{status: past_due}` arrives after `customer.subscription.updated{status: active}` (recovery), the user gets downgraded. Idempotency dedups duplicates but doesn't reject staler-by-timestamp events. Fix would be: persist `event.created` per subscription on the User row and reject older. Not a critical bug today (Stripe ordering is usually correct in practice), but worth tracking. Sketch: add `lastStripeEventCreatedAt: DateTime?` column, set `WHERE id = userId AND (lastStripeEventCreatedAt IS NULL OR lastStripeEventCreatedAt < now)` in the update.
+- ⚠️ **JWT-cached `subscriptionTier` is a latent foot-gun.** Today nothing in the codebase reads `session.user.subscriptionTier` for gating (entitlement checks all hit DB), so it's correct. But the field is in the JWT/Session type, frozen at sign-in. The next dev who writes `if (session.user.subscriptionTier === "PRO")` in a Server Component grants Pro for up to 30 days post-downgrade. Worth removing from the JWT entirely (`auth/callbacks.ts`) — search for `subscriptionTier` in the auth callback and the `next-auth.d.ts` type.
+- ⚠️ **Double-checkout race** — two near-simultaneous Upgrade clicks can create two Subscriptions on the same Customer. The user pays for one (the one they complete), but in theory could complete both. `cancelSubscription` only knows about the latest `stripeSubscriptionId`. Mitigation idea: in `createCheckoutSession`, refuse if Stripe already has any active subscription on the Customer (cheap `subscriptions.list({ customer, status: 'active' })`).
+- ⚠️ **Env-var validation at startup** — `STRIPE_*` env vars are only validated when their getters run (i.e. on first checkout click). Misconfigured prod fails late. Idea: add `instrumentation.ts` that calls all four getters at boot and refuses to start if any throw.
+- ⚠️ **Webhook is unit-tested by extension** of action tests, not directly. Manual smoke via `stripe trigger checkout.session.completed` etc. is the right verification path. Stripe CLI's `stripe trigger` is a one-line command; do that as part of the morning Stripe setup.
+
 ### Carried-over follow-ups
 
 - **Story 5.2 over-cap downgrade UX** — when a user cancels Pro and ends up over the listing cap, the spec says the board should render listings read-only with a prompt to archive. Not implemented in the autonomous run; the cap blocking on imports already works (`checkListingCap`), but the read-only board treatment is a focused follow-up. ~½ day.

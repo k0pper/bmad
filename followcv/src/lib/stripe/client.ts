@@ -25,8 +25,17 @@ export function getStripe(): Stripe {
     )
   }
   // Pin a recent stable API version so behaviour is deterministic across
-  // SDK upgrades; revisit when explicitly upgrading.
-  cached = new Stripe(key)
+  // SDK upgrades; revisit when explicitly upgrading. We cast through
+  // `unknown` because the SDK's `apiVersion` union is regenerated each
+  // release and would otherwise fail to type-check after upgrades.
+  cached = new Stripe(key, {
+    apiVersion:
+      "2025-09-30.clover" as unknown as ConstructorParameters<typeof Stripe>[1] extends infer C
+        ? C extends { apiVersion?: infer V }
+          ? V
+          : never
+        : never,
+  })
   return cached
 }
 

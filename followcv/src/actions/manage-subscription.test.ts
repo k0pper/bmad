@@ -104,21 +104,62 @@ describe("createCheckoutSession", () => {
       subscriptionTier: "FREE",
     })
     const customersCreate = vi.fn()
+    const customersRetrieve = vi
+      .fn()
+      .mockResolvedValue({ id: "cus_existing", deleted: false })
     const sessionsCreate = vi.fn().mockResolvedValue({
       url: "https://checkout.stripe.com/c/cs_test_123",
     })
     mockGetStripe.mockReturnValue({
-      customers: { create: customersCreate },
+      customers: { create: customersCreate, retrieve: customersRetrieve },
       checkout: { sessions: { create: sessionsCreate } },
     })
 
     await createCheckoutSession()
 
+    expect(customersRetrieve).toHaveBeenCalledWith("cus_existing")
     expect(customersCreate).not.toHaveBeenCalled()
     expect(mock.user.update).not.toHaveBeenCalled()
     expect(sessionsCreate).toHaveBeenCalledWith(
       expect.objectContaining({ customer: "cus_existing" }),
     )
+  })
+
+  it("recovers from a deleted Stripe Customer by creating a fresh one", async () => {
+    mock.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "alex@example.com",
+      stripeCustomerId: "cus_stale",
+      subscriptionTier: "FREE",
+    })
+    const customersRetrieve = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error("No such customer: cus_stale"), {
+          code: "resource_missing",
+        }),
+      )
+    const customersCreate = vi.fn().mockResolvedValue({ id: "cus_fresh" })
+    const sessionsCreate = vi.fn().mockResolvedValue({
+      url: "https://checkout.stripe.com/c/cs_new",
+    })
+    mockGetStripe.mockReturnValue({
+      customers: { retrieve: customersRetrieve, create: customersCreate },
+      checkout: { sessions: { create: sessionsCreate } },
+    })
+
+    const r = await createCheckoutSession()
+
+    expect(customersRetrieve).toHaveBeenCalledWith("cus_stale")
+    expect(customersCreate).toHaveBeenCalled()
+    expect(mock.user.update).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { stripeCustomerId: "cus_fresh" },
+    })
+    expect(sessionsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: "cus_fresh" }),
+    )
+    expect(r.data).toEqual({ checkoutUrl: "https://checkout.stripe.com/c/cs_new" })
   })
 
   it("returns an error when Stripe doesn't return a checkout URL", async () => {
@@ -129,7 +170,12 @@ describe("createCheckoutSession", () => {
       subscriptionTier: "FREE",
     })
     mockGetStripe.mockReturnValue({
-      customers: { create: vi.fn() },
+      customers: {
+        create: vi.fn(),
+        retrieve: vi
+          .fn()
+          .mockResolvedValue({ id: "cus_existing", deleted: false }),
+      },
       checkout: { sessions: { create: vi.fn().mockResolvedValue({ url: null }) } },
     })
     const r = await createCheckoutSession()
@@ -147,7 +193,12 @@ describe("createCheckoutSession", () => {
       subscriptionTier: "FREE",
     })
     mockGetStripe.mockReturnValue({
-      customers: { create: vi.fn() },
+      customers: {
+        create: vi.fn(),
+        retrieve: vi
+          .fn()
+          .mockResolvedValue({ id: "cus_existing", deleted: false }),
+      },
       checkout: {
         sessions: {
           create: vi.fn().mockRejectedValue(new Error("API down")),

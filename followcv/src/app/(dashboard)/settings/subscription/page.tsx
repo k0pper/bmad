@@ -28,9 +28,13 @@ export default async function SubscriptionSettingsPage() {
   })
   if (!user) redirect("/login")
 
-  // Try to fetch the next billing date for Pro users. Best-effort — if
-  // Stripe isn't configured locally, the page still renders without it.
+  // Try to fetch billing details from Stripe directly so the page reflects
+  // truth even if a webhook is delayed/missing. Best-effort — if Stripe
+  // isn't configured locally, fall back to the DB mirror.
   let nextBillingDate: Date | null = null
+  // `cancelsAt` may differ from the DB mirror if Stripe truth says the
+  // user un-cancelled but our webhook hasn't caught up yet.
+  let cancelsAt: Date | null = user.subscriptionEndsAt
   if (user.subscriptionTier === "PRO" && user.stripeSubscriptionId) {
     try {
       const stripe = getStripe()
@@ -42,6 +46,10 @@ export default async function SubscriptionSettingsPage() {
       if (periodEnd) {
         nextBillingDate = new Date(periodEnd * 1000)
       }
+      cancelsAt =
+        sub.cancel_at_period_end && sub.cancel_at
+          ? new Date(sub.cancel_at * 1000)
+          : null
     } catch {
       // Swallow — local dev without Stripe shouldn't crash this page.
     }
@@ -79,11 +87,11 @@ export default async function SubscriptionSettingsPage() {
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <dt style={{ color: "var(--color-text-secondary)" }}>Status</dt>
               <dd style={{ color: "var(--color-text-primary)" }}>
-                {user.subscriptionEndsAt
-                  ? `Cancels on ${formatDate(user.subscriptionEndsAt)}`
+                {cancelsAt
+                  ? `Cancels on ${formatDate(cancelsAt)}`
                   : "Active"}
               </dd>
-              {nextBillingDate && !user.subscriptionEndsAt && (
+              {nextBillingDate && !cancelsAt && (
                 <>
                   <dt style={{ color: "var(--color-text-secondary)" }}>
                     Next billing date
@@ -95,7 +103,7 @@ export default async function SubscriptionSettingsPage() {
               )}
             </dl>
           </div>
-          {!user.subscriptionEndsAt && <CancelSubscriptionButton />}
+          {!cancelsAt && <CancelSubscriptionButton />}
         </section>
       ) : (
         <section className="space-y-4">

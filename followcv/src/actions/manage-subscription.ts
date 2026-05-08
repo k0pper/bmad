@@ -48,9 +48,33 @@ export async function createCheckoutSession(): Promise<
     return { data: null, error: "You're already on the Pro plan" }
   }
 
+  const stripe = getStripe()
   let customerId = user.stripeCustomerId
+
   try {
-    const stripe = getStripe()
+    // Verify any existing Customer still exists in Stripe; if it was
+    // deleted (test-mode wipe, fraud action, manual cleanup), drop the
+    // stale id and create a fresh one — otherwise Stripe rejects the
+    // checkout with `resource_missing` and the user can never upgrade.
+    if (customerId) {
+      try {
+        const existing = await stripe.customers.retrieve(customerId)
+        if ("deleted" in existing && existing.deleted) {
+          customerId = null
+        }
+      } catch (err) {
+        const code =
+          typeof err === "object" && err !== null && "code" in err
+            ? (err as { code?: string }).code
+            : null
+        if (code === "resource_missing") {
+          customerId = null
+        } else {
+          throw err
+        }
+      }
+    }
+
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email,
@@ -72,6 +96,12 @@ export async function createCheckoutSession(): Promise<
       cancel_url: `${appUrl}/settings/subscription?status=cancelled`,
       // Lets the webhook resolve the session back to our internal user.
       client_reference_id: user.id,
+      // Stamp the userId on the Subscription too so the webhook can resolve
+      // out-of-order `customer.subscription.updated` events (which arrive
+      // without a Checkout Session reference).
+      subscription_data: {
+        metadata: { userId: user.id },
+      },
     })
     if (!checkout.url) {
       return { data: null, error: "Stripe didn't return a checkout URL" }
