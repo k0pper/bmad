@@ -9,6 +9,14 @@ import { IDLE_TIMEOUT_MS } from "./constants"
 type JwtCallbackParams = {
   token: JWT
   user?: User | AdapterUser | null
+  trigger?: "signIn" | "signUp" | "update"
+  /**
+   * The payload passed to `unstable_update()`. Auth.js calls the JWT
+   * callback with `trigger === "update"` when an explicit session update
+   * is requested (e.g. after Gmail OAuth connect). The shape is
+   * `Partial<Session> | { user: Partial<Session["user"]> }`.
+   */
+  session?: { user?: Partial<{ gmailConnected: boolean }> } | null
 }
 
 type SessionCallbackParams = {
@@ -24,7 +32,7 @@ type AuthorizedCallbackParams = {
 type DbUser = { id: string; role: UserRole; subscriptionTier: SubscriptionTier }
 
 export async function jwtCallback(
-  { token, user }: JwtCallbackParams,
+  { token, user, trigger, session }: JwtCallbackParams,
   findOrCreateUser: (email: string, name: string | null) => Promise<DbUser>
 ): Promise<JWT> {
   if (user?.email) {
@@ -33,6 +41,14 @@ export async function jwtCallback(
     token.role = dbUser.role
     token.subscriptionTier = dbUser.subscriptionTier
     token.gmailConnected = false
+  }
+  // `unstable_update({ user: { gmailConnected } })` flows through here.
+  // The JWT-cached `gmailConnected` is a UI hint only — every server-side
+  // gate must re-read from the DB (see story 6.1 dev notes).
+  if (trigger === "update" && session?.user) {
+    if (typeof session.user.gmailConnected === "boolean") {
+      token.gmailConnected = session.user.gmailConnected
+    }
   }
   token.lastActivity = Date.now()
   return token

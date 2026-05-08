@@ -65,6 +65,70 @@ describe("jwtCallback", () => {
     const token = await jwtCallback({ token: {} as JWT, user: null }, mockFindOrCreate)
     expect(token.lastActivity).toBeGreaterThanOrEqual(before)
   })
+
+  describe("trigger: update", () => {
+    it("flips gmailConnected true on the token", async () => {
+      const existing: JWT = {
+        userId: "user-1",
+        role: "USER",
+        subscriptionTier: "FREE",
+        gmailConnected: false,
+      }
+      const token = await jwtCallback(
+        {
+          token: existing,
+          user: null,
+          trigger: "update",
+          session: { user: { gmailConnected: true } },
+        },
+        mockFindOrCreate,
+      )
+      expect(token.gmailConnected).toBe(true)
+      expect(mockFindOrCreate).not.toHaveBeenCalled()
+    })
+
+    it("flips gmailConnected false on the token", async () => {
+      const existing: JWT = {
+        userId: "user-1",
+        role: "USER",
+        subscriptionTier: "PRO",
+        gmailConnected: true,
+      }
+      const token = await jwtCallback(
+        {
+          token: existing,
+          user: null,
+          trigger: "update",
+          session: { user: { gmailConnected: false } },
+        },
+        mockFindOrCreate,
+      )
+      expect(token.gmailConnected).toBe(false)
+    })
+
+    it("ignores update when session.user is missing", async () => {
+      const existing: JWT = { gmailConnected: true } as JWT
+      const token = await jwtCallback(
+        { token: existing, user: null, trigger: "update", session: null },
+        mockFindOrCreate,
+      )
+      expect(token.gmailConnected).toBe(true)
+    })
+
+    it("ignores update when gmailConnected is not boolean", async () => {
+      const existing: JWT = { gmailConnected: true } as JWT
+      const token = await jwtCallback(
+        {
+          token: existing,
+          user: null,
+          trigger: "update",
+          session: { user: {} },
+        },
+        mockFindOrCreate,
+      )
+      expect(token.gmailConnected).toBe(true)
+    })
+  })
 })
 
 // ── sessionCallback ───────────────────────────────────────────────────────────

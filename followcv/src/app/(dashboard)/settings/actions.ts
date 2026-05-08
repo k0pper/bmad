@@ -1,7 +1,7 @@
 "use server"
 
 import { redirect } from "next/navigation"
-import { auth, signOut } from "@/lib/auth"
+import { auth, signOut, unstable_update } from "@/lib/auth"
 import { updatePreferenceProfile } from "@/lib/preferences/service"
 import { deleteAccount, revokeGmailAccess } from "@/lib/account/service"
 
@@ -56,6 +56,9 @@ export async function revokeGmailToken(): Promise<SettingsActionState> {
   if (!session?.user?.id) return { type: "error", message: "Not authenticated" }
 
   await revokeGmailAccess(session.user.id)
+  // JWT flag is a UI hint only — every server-side gate re-reads from DB —
+  // but flipping it keeps the in-flight UI consistent without a sign-out.
+  await unstable_update({ user: { gmailConnected: false } })
   return { type: "success", message: "Gmail access revoked" }
 }
 

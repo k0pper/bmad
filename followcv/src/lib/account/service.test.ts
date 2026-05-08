@@ -115,23 +115,79 @@ describe("deleteAccount", () => {
 
 describe("revokeGmailAccess", () => {
   it("deletes the gmail token row by id (no deleteMany — Neon HTTP rule)", async () => {
-    mockGmailFindFirst.mockResolvedValue({ id: "token-1" })
+    mockGmailFindFirst.mockResolvedValue({
+      id: "token-1",
+      accessToken: "ya29.x",
+    })
     mockGmailDelete.mockResolvedValue({ id: "token-1" })
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 200 }))
+    vi.stubGlobal("fetch", fetchSpy)
 
     await revokeGmailAccess("user-1")
 
     expect(mockGmailFindFirst).toHaveBeenCalledWith({
       where: { userId: "user-1" },
-      select: { id: true },
+      select: { id: true, accessToken: true },
     })
+    // Best-effort revocation call to Google
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://oauth2.googleapis.com/revoke?token=ya29.x",
+      { method: "POST" },
+    )
     expect(mockGmailDelete).toHaveBeenCalledWith({ where: { id: "token-1" } })
+    vi.unstubAllGlobals()
   })
 
-  it("is a no-op when no token exists", async () => {
+  it("still deletes the row when the Google revoke call fails", async () => {
+    mockGmailFindFirst.mockResolvedValue({
+      id: "token-1",
+      accessToken: "ya29.x",
+    })
+    mockGmailDelete.mockResolvedValue({ id: "token-1" })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network down")),
+    )
+
+    await revokeGmailAccess("user-1")
+
+    expect(mockGmailDelete).toHaveBeenCalledWith({ where: { id: "token-1" } })
+    vi.unstubAllGlobals()
+  })
+
+  it("is a no-op when no token exists (no Google call, no DB delete)", async () => {
     mockGmailFindFirst.mockResolvedValue(null)
+    const fetchSpy = vi.fn()
+    vi.stubGlobal("fetch", fetchSpy)
 
     await revokeGmailAccess("user-1")
 
     expect(mockGmailDelete).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it("does not touch JobListing or Application data", async () => {
+    // The mock surface only exposes `gmailToken.*` and `cv*` /  `user.*`.
+    // No `jobListing` or `application` access methods are even mocked, so
+    // any call that touched them would throw `... is not a function`.
+    // This serves as a typed regression assertion for AC8.
+    mockGmailFindFirst.mockResolvedValue({
+      id: "token-1",
+      accessToken: "ya29.x",
+    })
+    mockGmailDelete.mockResolvedValue({ id: "token-1" })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 200 })),
+    )
+
+    await expect(revokeGmailAccess("user-1")).resolves.not.toThrow()
+
+    expect("jobListing" in mock).toBe(false)
+    expect("application" in mock).toBe(false)
+    vi.unstubAllGlobals()
   })
 })

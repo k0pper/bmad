@@ -6,6 +6,7 @@ import { SidebarShell } from '@/components/shared/SidebarShell'
 import { Logo } from '@/components/shared/Logo'
 import { NavLink } from '@/components/shared/NavLink'
 import { HealthScoreWidget } from '@/components/health/HealthScoreWidget'
+import { GmailConnectPrompt } from '@/components/health/GmailConnectPrompt'
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -25,6 +26,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Health score widget — Server Component; queries Prisma at render time. */}
         <Suspense fallback={<div data-testid="health-score-slot" />}>
           <HealthScoreWidget />
+        </Suspense>
+
+        {/* Gmail connect prompt — visible only to Pro users with ≥3
+            imports who haven't connected Gmail yet. Story 6.1 AC10. */}
+        <Suspense fallback={null}>
+          <GmailConnectPrompt />
         </Suspense>
 
         {/* Navigation */}

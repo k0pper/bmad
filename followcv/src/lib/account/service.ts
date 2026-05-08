@@ -51,6 +51,13 @@ export async function deleteAccount(userId: string) {
 /**
  * Revoke the user's Gmail OAuth tokens.
  *
+ * Order of operations:
+ * 1. Look up the row (need `accessToken` for the Google revocation call).
+ * 2. Best-effort POST to https://oauth2.googleapis.com/revoke so the OAuth
+ *    grant is cleaned up on Google's side. Failures are swallowed — the
+ *    DB delete is the source of truth, the Google call is a courtesy.
+ * 3. Delete the row by id.
+ *
  * `gmailToken` is a 1:1 relation on User (`@unique` on `userId`), so a
  * single-row delete via `findFirst` + `delete` is sufficient and
  * compatible with the Neon HTTP driver (no `deleteMany`, no implicit
@@ -59,8 +66,20 @@ export async function deleteAccount(userId: string) {
 export async function revokeGmailAccess(userId: string) {
   const token = await prisma.gmailToken.findFirst({
     where: { userId },
-    select: { id: true },
+    select: { id: true, accessToken: true },
   })
   if (!token) return
+
+  // Best-effort: tell Google to invalidate the grant so the user's
+  // Google account "Apps with access" page reflects the disconnect.
+  try {
+    await fetch(
+      `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token.accessToken)}`,
+      { method: "POST" },
+    )
+  } catch {
+    // Swallowed — see fn doc comment.
+  }
+
   await prisma.gmailToken.delete({ where: { id: token.id } })
 }

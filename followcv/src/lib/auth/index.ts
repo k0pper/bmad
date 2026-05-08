@@ -5,7 +5,7 @@ import { jwtCallback, sessionCallback, authorizedCallback } from "./callbacks"
 
 export { IDLE_TIMEOUT_MS } from "./constants"
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   providers: [Google],
   session: {
     strategy: "jwt",

@@ -59,15 +59,7 @@ export function getStripeWebhookSecret(): string {
   return secret
 }
 
-export function getAppUrl(): string {
-  const url =
-    process.env.APP_URL ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.VERCEL_URL
-  if (!url) {
-    throw new Error("APP_URL is not set; can't construct Stripe redirect URLs.")
-  }
-  // Vercel sets VERCEL_URL without a scheme; Stripe needs a fully-qualified
-  // redirect.
-  return url.startsWith("http") ? url : `https://${url}`
-}
+// Re-exported from the generic helper so existing call sites and test
+// mocks (`vi.mock("@/lib/stripe/client", () => ({ getAppUrl: ... }))`)
+// continue to work. Source of truth is `@/lib/app-url`.
+export { getAppUrl } from "@/lib/app-url"
