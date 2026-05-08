@@ -2,6 +2,12 @@
 
 Started: 2026-05-08 (late evening). Working through remaining Epic 3+ stories on `main`. All commits are pushed.
 
+## Headline
+
+**8 stories shipped on `main`** plus a focused code-review pass on the Stripe code. 293 tests green; lint, types, and `next build` all clean. Every story spec under `_bmad-output/implementation-artifacts/` is `Status: done`. The only thing that needs your hands tomorrow is the **Stripe configuration** below — without it Story 5.2's Upgrade button will throw "STRIPE_SECRET_KEY is not set".
+
+Epics 6 (Gmail OAuth) and 7 (Admin tooling) were intentionally not started: Epic 6 needs Google OAuth credentials + an encryption-at-rest key + Gmail API quota review, and Epic 7 is internal-only tooling whose value depends on user volume. Both are good follow-ups whenever you want to pick them up.
+
 ## Stories shipped tonight
 
 - **3.3 — Record Application with CV Snapshot** ✅ (+8 commits, 9 files, 14 tests; schema cascade migration + apply-to-job action + ApplyRitualDialog + Board wiring + account-deletion blob cleanup)
@@ -69,7 +75,7 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, "updatedAt" = now();
 - **4.1 — Health Score Engine** ✅ (pure function with 5 indicators, 20 unit tests covering every threshold boundary, every priority pair, edge cases, purity)
 - **4.2 — Health Score Widget** ✅ (Server Component in the dashboard sidebar, under `<Suspense>` so it doesn't block layout)
 - **5.1 — Listing Cap Enforcement** ✅ (Pro short-circuit, ProGatePattern reusable component, 80%/90% banners)
-- **5.2 — Pro Subscription via Stripe** ✅ code-only — needs the configuration above to work end-to-end
+- **5.2 — Pro Subscription via Stripe** ✅ code-only — needs the configuration above to work end-to-end. **Adversarial review run + 9 hardening fixes applied** (idempotency, customer-metadata fallback, deleted-customer recovery, structured logging, etc.) — see "Stripe webhook code review" section below for the residual risks to triage.
 
 ### Stripe webhook code review — what I patched and what I left
 
