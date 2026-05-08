@@ -1,6 +1,6 @@
 # Story 3.4: Application Status Management & Notes
 
-Status: in-progress
+Status: done
 
 ## Story
 
