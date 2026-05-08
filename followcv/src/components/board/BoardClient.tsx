@@ -39,6 +39,7 @@ export type BoardListing = {
   closingDate: Date | null
   isRecent: boolean
   applied: boolean
+  followUpDue: boolean
 }
 
 export function BoardClient({
@@ -139,6 +140,7 @@ export function BoardClient({
               salaryCurrency={listing.salaryCurrency}
               archived={listing.archived}
               applied={listing.applied}
+              followUpDue={listing.followUpDue}
               isRecent={listing.isRecent}
               rowIndex={index}
               onApplyClick={

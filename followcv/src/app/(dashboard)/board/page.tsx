@@ -4,6 +4,10 @@ import { getPreferenceProfile } from "@/lib/preferences/service"
 import { prisma } from "@/lib/db"
 import { BoardClient, type BoardListing } from "@/components/board/BoardClient"
 import { StalenessBanner } from "@/components/board/StalenessBanner"
+import {
+  getFollowUpThresholdDays,
+  isFollowUpDue,
+} from "@/lib/services/follow-up-detector"
 import type { OverrideSource, VitalityState, ImportSource } from "@/generated/prisma/client"
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
@@ -13,7 +17,9 @@ function getBoardListings(userId: string, archived: boolean) {
   return prisma.jobListing.findMany({
     where: { userId, archived, deletedAt: null },
     orderBy: { createdAt: "desc" },
-    include: { application: { select: { id: true } } },
+    include: {
+      application: { select: { id: true, status: true, updatedAt: true } },
+    },
   })
 }
 
@@ -31,7 +37,7 @@ export default async function BoardPage({
   const params = await searchParams
   const showArchived = params.archived === "true"
 
-  const [listings, user, cvVersionsRaw] = await Promise.all([
+  const [listings, user, cvVersionsRaw, followUpThresholdDays] = await Promise.all([
     getBoardListings(session.user.id, showArchived),
     prisma.user.findUnique({ where: { id: session.user.id }, select: { lastVisitAt: true } }),
     prisma.cvVersion.findMany({
@@ -39,6 +45,7 @@ export default async function BoardPage({
       orderBy: { uploadedAt: "desc" },
       select: { id: true, name: true, uploadedAt: true },
     }),
+    getFollowUpThresholdDays(),
   ])
 
   const previousVisitAt = user?.lastVisitAt ?? null
@@ -73,6 +80,17 @@ export default async function BoardPage({
     notes: listing.notes,
     closingDate: listing.closingDate,
     applied: listing.application !== null,
+    followUpDue: isFollowUpDue({
+      application: listing.application
+        ? {
+            status: listing.application.status,
+            updatedAt: listing.application.updatedAt,
+          }
+        : null,
+      archived: listing.archived,
+      thresholdDays: followUpThresholdDays,
+      now: new Date(nowMs),
+    }),
     isRecent:
       !showArchived &&
       listing.stateChangedAt !== null &&

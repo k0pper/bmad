@@ -56,6 +56,7 @@ function makeListing(
     closingDate: overrides.closingDate ?? null,
     isRecent: overrides.isRecent ?? false,
     applied: overrides.applied ?? false,
+    followUpDue: overrides.followUpDue ?? false,
   }
 }
 

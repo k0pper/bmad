@@ -20,6 +20,7 @@ type BoardRowProps = {
   salaryCurrency: string | null
   archived?: boolean
   applied?: boolean
+  followUpDue?: boolean
   isRecent?: boolean
   rowIndex?: number
   /**
@@ -65,6 +66,7 @@ export function BoardRow({
   salaryCurrency,
   archived = false,
   applied = false,
+  followUpDue = false,
   isRecent = false,
   rowIndex = 0,
   onApplyClick,
@@ -130,8 +132,19 @@ export function BoardRow({
         {dateLabel}
       </span>
 
-      {/* Apply / Applied indicator */}
-      {applied ? (
+      {/* Apply / Applied / Follow-up indicator */}
+      {applied && followUpDue ? (
+        <span
+          className="hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider sm:inline-block"
+          style={{
+            backgroundColor: "var(--color-vitality-deadline-bg, #fef3c7)",
+            color: "var(--color-vitality-deadline-text, #92400e)",
+          }}
+          title="No activity recently — time to follow up"
+        >
+          Follow up
+        </span>
+      ) : applied ? (
         <span
           className="hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider sm:inline-block"
           style={{
