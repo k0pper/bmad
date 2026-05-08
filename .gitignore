@@ -3,3 +3,10 @@
 node_modules/
 package.json
 package-lock.json
+
+# Playwright MCP per-session debug output (page snapshots, console logs).
+# Regenerated on every MCP browser session; never useful in history.
+.playwright-mcp/
+
+# Ad-hoc screenshots captured during dev / OAuth debugging.
+*.png
