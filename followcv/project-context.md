@@ -123,3 +123,35 @@ The processor reuses everything from Story 6.1 (encryption, decryption, `revokeG
 ## `/settings/gmail` is the canonical Gmail surface
 
 The dedicated page at [`src/app/(dashboard)/settings/gmail/page.tsx`](../followcv/src/app/(dashboard)/settings/gmail/page.tsx) is the home for connect/disconnect (full-page consent ceremony per UX spec Journey 4 — trust stakes justify the space). The legacy "Revoke Gmail" button still lives in `AccountDangerZone` on `/settings`; it works but is no longer the primary affordance. New Gmail UX should slot into `/settings/gmail`, not the danger zone.
+
+## Portaled UI nested inside `<Link>` — React-tree bubbling trap
+
+`BoardRow` wraps the entire row in a `<Link>`. Several interactive children sit inside it: `VitalityOverrideMenu`, `BoardRowOverflowMenu`, and the `Toast` they render on success. Menus and the toast are portaled to `<body>` (Base UI's `Menu.Portal`, React's `createPortal`), which moves them **out of the Link in the DOM tree** — but **React synthetic events bubble through the React component tree, not the DOM tree**. A click inside the portal still bubbles back to the component that rendered the portal, and if that component sits inside the `<Link>`, the Link's onClick fires and Next router navigates.
+
+This bug has shipped twice (commits `844f2c4` for menu items, `<this commit>` for the Toast). Both times the trigger had `preventDefault + stopPropagation` and the portal content did not.
+
+```tsx
+// ❌ NEVER — relying on DOM nesting to stop the Link
+<Menu.Portal>
+  <Menu.Item onClick={handleSelect}>...</Menu.Item>  // bubbles back to <Link>
+</Menu.Portal>
+
+createPortal(
+  <div>
+    <button onClick={handleAction}>Undo</button>     // bubbles back to <Link>
+  </div>,
+  document.body
+)
+
+// ✅ ALWAYS — stop propagation at the portal content root or on each handler
+<Menu.Item onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSelect() }} />
+
+createPortal(
+  <div onClick={(e) => e.stopPropagation()}>         // catches every click in the toast
+    <button onClick={handleAction}>Undo</button>
+  </div>,
+  document.body
+)
+```
+
+**Rule when adding any new interactive UI inside a `BoardRow` / `<Link>` / clickable card:** if it portals (Menu, Popover, Dialog, Toast, custom `createPortal`), assume clicks inside it WILL navigate the parent unless you stop propagation at the portal's root. The trigger handlers alone are not enough.

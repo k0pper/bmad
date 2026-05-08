@@ -78,6 +78,13 @@ export function Toast({ message, durationSeconds = 5, action, onDismiss }: Props
     <div
       role="status"
       aria-live="polite"
+      // Toast is portaled to <body>, but it's instantiated inside callers that
+      // sit within BoardRow's outer <Link> (VitalityOverrideMenu,
+      // BoardRowOverflowMenu). React synthetic events bubble through the
+      // component tree, not the DOM tree, so a click on Undo or × would
+      // otherwise navigate to /board/[listingId]. Stopping propagation at the
+      // root catches every click inside the toast (button + text).
+      onClick={(e) => e.stopPropagation()}
       className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-md border bg-white px-4 py-3 shadow-lg"
       style={{ borderColor: "var(--color-border, #e2e8f0)" }}
     >

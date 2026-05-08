@@ -370,3 +370,5 @@ claude-opus-4-7[1m]
 |------|--------|--------|
 | 2026-05-06 | Story created | bmad-create-story |
 | 2026-05-06 | All tasks implemented; lint, types, 111 tests green; status → review | claude-opus-4-7 |
+| 2026-05-06 | Post-story: `UndoToast` generalized into reusable `Toast` (action prop optional) and reused for archive/save flows. File: `src/components/ui/Toast.tsx`. Single-instance event renamed `undo-toast-show` → `toast-show`. (commit e5dce6a) | claude-opus-4-7 |
+| 2026-05-08 | Post-story fix: Undo/dismiss clicks inside `Toast` were navigating the BoardRow `<Link>` because the toast — though portaled to `<body>` — is instantiated inside the row and React synthetic events bubble through the component tree. Resolved by adding `onClick={(e) => e.stopPropagation()}` at the toast root. Same root cause as the menu-click fix in 844f2c4. | claude-opus-4-7 |
