@@ -147,6 +147,23 @@ describe("overrideVitality", () => {
     const result = await overrideVitality("listing-1", "IN_DIALOGUE")
     expect(result.error).toBeNull()
   })
+
+  it("does NOT bump stateChangedAt when overriding to the same state already shown", async () => {
+    // Re-applying the same override is a no-op for the user but used to
+    // refresh stateChangedAt to "now". That phantom change leaks into UI
+    // copy like "X days in this state" — we only bump on real transitions.
+    mockAuth.mockResolvedValue(validSession)
+    mockPrisma.jobListing.findFirst.mockResolvedValue({
+      ...baseListing,
+      vitalityState: "ACTIVE",
+    })
+
+    await overrideVitality("listing-1", "ACTIVE")
+
+    const updateCall = mockPrisma.jobListing.update.mock.calls[0][0]
+    expect(updateCall.data.stateChangedAt).toBeUndefined()
+    expect(updateCall.data.lastComputedAt).toBeInstanceOf(Date)
+  })
 })
 
 describe("clearVitalityOverride", () => {

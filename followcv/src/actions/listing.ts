@@ -64,14 +64,19 @@ export async function overrideVitality(
   }
 
   const now = new Date()
+  // Only bump stateChangedAt when the displayed state actually changes —
+  // otherwise re-applying the same override (e.g. user toggles to the same
+  // value) would create a phantom state-change timestamp that the rest of
+  // the UI uses to drive "X days in this state" copy.
+  const stateChanged = newState !== listing.vitalityState
   await prisma.jobListing.update({
     where: { id: listingId },
     data: {
       vitalityState: newState,
       overrideState: newState,
       overrideSource: "USER",
-      stateChangedAt: now,
       lastComputedAt: now,
+      ...(stateChanged ? { stateChangedAt: now } : {}),
     },
   })
 

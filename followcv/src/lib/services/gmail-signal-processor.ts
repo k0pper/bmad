@@ -33,6 +33,10 @@ export type ProcessorResult = {
   status: "ok" | "revoked" | "no-token"
   checked: number
   found: number
+  /** Number of domains for which the Gmail API call failed. The watermark
+   * is still advanced on these — we accept missing one tick's signals to
+   * avoid duplicating audit rows for the domains that did succeed. */
+  errors?: number
 }
 
 type ListingForDomainCheck = {
@@ -95,13 +99,27 @@ export async function processGmailSignalsForUser(
   }
 
   // ── 4. Query Gmail per domain ──────────────────────────────────────────
+  // Each domain is wrapped in try/catch so one transient Gmail 5xx for
+  // company A doesn't strand the user's whole tick — we'd otherwise fail
+  // to advance the watermark and re-process domain B (already audited)
+  // on the next tick, double-writing audit rows.
   let found = 0
+  let errors = 0
   for (const [domain, listingsForDomain] of byDomain) {
-    const hasMatch = await checkDomainHasNewMail(
-      accessToken,
-      domain,
-      floorSeconds,
-    )
+    let hasMatch: boolean
+    try {
+      hasMatch = await checkDomainHasNewMail(
+        accessToken,
+        domain,
+        floorSeconds,
+      )
+    } catch (err) {
+      errors++
+      console.error(
+        `[gmail-signal] domain check failed for user=${userId} (${(err as Error).message})`,
+      )
+      continue
+    }
     if (!hasMatch) continue
 
     // Write one audit log per listing where the application predates `now`.
@@ -125,7 +143,7 @@ export async function processGmailSignalsForUser(
   // ── 5. Update the watermark ────────────────────────────────────────────
   await setLastSignalCheckAt(userId, now)
 
-  return { status: "ok", checked: byDomain.size, found }
+  return { status: "ok", checked: byDomain.size, found, errors }
 }
 
 async function checkDomainHasNewMail(

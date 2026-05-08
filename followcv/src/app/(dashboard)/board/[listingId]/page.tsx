@@ -85,32 +85,24 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       })
     } catch { /* non-critical */ }
     displayState = freshState
+  } else if (freshState !== null) {
+    // Even if the state didn't change, bump lastComputedAt so the board
+    // page's "stale" indicator doesn't keep flagging this listing — we
+    // just verified it. No audit log: there was no transition to record.
+    await prisma.jobListing.update({
+      where: { id: listing.id },
+      data: { lastComputedAt: now },
+    })
   }
 
   const salary = formatSalary(listing.salaryMin, listing.salaryMax, listing.salaryCurrency)
 
-  // Build accordion sections
+  // Section order is intentional: the things the user came here to act on
+  // (application status, personal notes, listing fields) sit at the top;
+  // the vitality calculation explainer is informational and lives at the
+  // bottom. The application section is opened by default if there is an
+  // application — otherwise the notes section.
   const accordionSections = [
-    {
-      id: "vitality",
-      label: "Why this state?",
-      children: (
-        <VitalityExplanation
-          explanation={explanation}
-          finalState={displayState}
-        />
-      ),
-    },
-    {
-      id: "notes",
-      label: "Notes",
-      children: (
-        <ListingNotesField
-          listingId={listing.id}
-          initialNotes={listing.notes}
-        />
-      ),
-    },
     {
       id: "application",
       label: "Application",
@@ -191,8 +183,18 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       ),
     },
     {
+      id: "notes",
+      label: "Notes",
+      children: (
+        <ListingNotesField
+          listingId={listing.id}
+          initialNotes={listing.notes}
+        />
+      ),
+    },
+    {
       id: "edit",
-      label: "Edit",
+      label: "Edit listing details",
       children: (
         <ListingEditForm
           listingId={listing.id}
@@ -209,7 +211,22 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
         />
       ),
     },
+    {
+      id: "vitality",
+      label: "Why this state?",
+      children: (
+        <VitalityExplanation
+          explanation={explanation}
+          finalState={displayState}
+        />
+      ),
+    },
   ]
+
+  // Open the application section by default when one exists, otherwise the
+  // notes section — both are user-actionable. The vitality explainer stays
+  // collapsed; users only open it when they're confused about a state.
+  const defaultOpenSections = listing.application ? ["application"] : ["notes"]
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
@@ -282,7 +299,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
 
       {/* Expandable sections */}
       <div className="border-t" style={{ borderColor: "var(--color-border, #e2e8f0)" }}>
-        <DetailAccordion sections={accordionSections} defaultOpen={["vitality"]} />
+        <DetailAccordion sections={accordionSections} defaultOpen={defaultOpenSections} />
       </div>
 
       <div className="pt-4">

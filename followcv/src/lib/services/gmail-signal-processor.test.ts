@@ -88,7 +88,7 @@ describe("processGmailSignalsForUser", () => {
 
     const result = await processGmailSignalsForUser("user-1", NOW)
 
-    expect(result).toEqual({ status: "ok", checked: 0, found: 0 })
+    expect(result).toMatchObject({ status: "ok", checked: 0, found: 0 })
     expect(mockedSetWatermark).toHaveBeenCalledWith("user-1", NOW)
     expect(global.fetch).not.toHaveBeenCalled()
   })
@@ -116,7 +116,7 @@ describe("processGmailSignalsForUser", () => {
 
     const result = await processGmailSignalsForUser("user-1", NOW)
 
-    expect(result).toEqual({ status: "ok", checked: 1, found: 0 })
+    expect(result).toEqual({ status: "ok", checked: 1, found: 0, errors: 0 })
     expect(mockedPrisma.auditLog.create).not.toHaveBeenCalled()
     expect(mockedSetWatermark).toHaveBeenCalledWith("user-1", NOW)
   })
@@ -156,7 +156,7 @@ describe("processGmailSignalsForUser", () => {
     const result = await processGmailSignalsForUser("user-1", NOW)
 
     // 2 distinct domains queried; 3 listings affected (2 acme + 1 other)
-    expect(result).toEqual({ status: "ok", checked: 2, found: 3 })
+    expect(result).toEqual({ status: "ok", checked: 2, found: 3, errors: 0 })
     expect(fetchSpy).toHaveBeenCalledTimes(2)
     expect(mockedPrisma.auditLog.create).toHaveBeenCalledTimes(3)
     expect(mockedPrisma.auditLog.create).toHaveBeenCalledWith({
@@ -259,7 +259,11 @@ describe("processGmailSignalsForUser", () => {
     expect(headers.Authorization).toBe("Bearer ya29.SUPER")
   })
 
-  it("propagates Gmail API non-200 as a thrown error (caller catches per-user)", async () => {
+  it("isolates per-domain Gmail API failures: counts the error, advances watermark, and writes audits for healthy domains", async () => {
+    // A 5xx (or any non-2xx) on one domain used to abort the whole user's
+    // tick — leaving the watermark un-advanced and re-writing audit logs
+    // on the next tick for already-processed domains. Now we count the
+    // failure, skip that domain, and continue.
     mockedCheckpoint.mockResolvedValue({
       lastSignalCheckAt: null,
       createdAt: CONNECTED_AT,
@@ -272,19 +276,36 @@ describe("processGmailSignalsForUser", () => {
     mockedPrisma.jobListing.findMany.mockResolvedValue([
       {
         id: "listing-1",
-        companyDomain: "acme.com",
+        companyDomain: "broken.com",
+        application: { appliedAt: APPLIED_AT },
+      },
+      {
+        id: "listing-2",
+        companyDomain: "healthy.com",
         application: { appliedAt: APPLIED_AT },
       },
     ])
-    vi.spyOn(global, "fetch").mockResolvedValue(
-      new Response("permission denied", { status: 403 }),
-    )
+    vi.spyOn(global, "fetch").mockImplementation(async (input) => {
+      const url = new URL(input as string)
+      if (url.searchParams.get("q")?.includes("broken.com")) {
+        return new Response("internal", { status: 500 })
+      }
+      return new Response(JSON.stringify({ resultSizeEstimate: 1 }), { status: 200 })
+    })
 
-    await expect(processGmailSignalsForUser("user-1", NOW)).rejects.toThrow(
-      /Gmail messages.list failed/,
-    )
-    expect(mockedSetWatermark).not.toHaveBeenCalled()
-    expect(mockedPrisma.auditLog.create).not.toHaveBeenCalled()
+    const result = await processGmailSignalsForUser("user-1", NOW)
+
+    expect(result).toEqual({ status: "ok", checked: 2, found: 1, errors: 1 })
+    expect(mockedSetWatermark).toHaveBeenCalledWith("user-1", NOW)
+    expect(mockedPrisma.auditLog.create).toHaveBeenCalledTimes(1)
+    expect(mockedPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        source: "GMAIL_SIGNAL",
+        userId: "user-1",
+        listingId: "listing-2",
+        computedAt: NOW,
+      },
+    })
   })
 
   it("never fetches a single message body (privacy hard rule)", async () => {
@@ -379,7 +400,7 @@ describe("processGmailSignalsForUser", () => {
 
     const result = await processGmailSignalsForUser("user-1", NOW)
 
-    expect(result).toEqual({ status: "ok", checked: 1, found: 0 })
+    expect(result).toEqual({ status: "ok", checked: 1, found: 0, errors: 0 })
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     expect(mockedPrisma.auditLog.create).not.toHaveBeenCalled()
     // Watermark must still advance even on a no-match tick — otherwise the
