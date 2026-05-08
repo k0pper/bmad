@@ -68,7 +68,7 @@ describe("importFromUrl", () => {
 
   it("returns error when URL is invalid", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25, isPro: false })
 
     const result = await importFromUrl(makeFormData("not-a-url"))
 
@@ -78,7 +78,7 @@ describe("importFromUrl", () => {
 
   it("returns cap_reached when at listing limit", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: false, count: 25, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: false, count: 25, cap: 25, isPro: false })
 
     const result = await importFromUrl(makeFormData(testUrl))
 
@@ -88,7 +88,7 @@ describe("importFromUrl", () => {
 
   it("returns duplicate when URL already tracked", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 5, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 5, cap: 25, isPro: false })
     mockPrisma.jobListing.findFirst.mockResolvedValue({
       id: "listing-1",
       title: "Senior Engineer",
@@ -108,7 +108,7 @@ describe("importFromUrl", () => {
 
   it("returns error when scrape fails", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 5, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 5, cap: 25, isPro: false })
     mockPrisma.jobListing.findFirst.mockResolvedValue(null)
     mockScrape.mockResolvedValue({ data: null, partial: false, error: "Timed out" })
 
@@ -119,7 +119,7 @@ describe("importFromUrl", () => {
 
   it("creates listing and returns created status on success", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 5, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 5, cap: 25, isPro: false })
     mockPrisma.jobListing.findFirst.mockResolvedValue(null)
     mockScrape.mockResolvedValue({
       data: { title: "Senior Engineer", company: "Acme Corp", companyDomain: "example.com" },
@@ -150,7 +150,7 @@ describe("importFromUrl", () => {
 
   it("does not call revalidateTag (board uses direct Prisma query + router.refresh)", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25, isPro: false })
     mockPrisma.jobListing.findFirst.mockResolvedValue(null)
     mockScrape.mockResolvedValue({
       data: { title: "Dev", company: "Corp" },
@@ -172,7 +172,7 @@ describe("importFromUrl", () => {
 
   it("uses URL as title fallback when scrape returns no title", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25, isPro: false })
     mockPrisma.jobListing.findFirst.mockResolvedValue(null)
     mockScrape.mockResolvedValue({ data: {}, partial: true, error: null })
     mockCompute.mockReturnValue("COOLING")
@@ -212,7 +212,7 @@ describe("manualImportListing", () => {
 
   it("returns cap_reached when at listing limit", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: false, count: 25, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: false, count: 25, cap: 25, isPro: false })
     const result = await manualImportListing(makeManualFormData())
     expect(result.data).toEqual({ status: "cap_reached", count: 25, cap: 25 })
     expect(result.error).toBeNull()
@@ -220,7 +220,7 @@ describe("manualImportListing", () => {
 
   it("returns error when title is missing", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25, isPro: false })
     const fd = new FormData()
     fd.append("company", "Acme Corp")
     const result = await manualImportListing(fd)
@@ -230,7 +230,7 @@ describe("manualImportListing", () => {
 
   it("returns error when company is missing", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25, isPro: false })
     const fd = new FormData()
     fd.append("title", "Engineer")
     const result = await manualImportListing(fd)
@@ -240,7 +240,7 @@ describe("manualImportListing", () => {
 
   it("creates listing with MANUAL importSource on success", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25, isPro: false })
     mockCompute.mockReturnValue("COOLING")
     mockPrisma.jobListing.create.mockResolvedValue({
       id: "manual-1",
@@ -263,7 +263,7 @@ describe("manualImportListing", () => {
 
   it("passes optional fields through to the listing", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25, isPro: false })
     mockCompute.mockReturnValue("COOLING")
     mockPrisma.jobListing.create.mockResolvedValue({
       id: "manual-2",
@@ -291,7 +291,7 @@ describe("manualImportListing", () => {
 
   it("does not call revalidateTag", async () => {
     mockAuth.mockResolvedValue(validSession)
-    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25 })
+    mockCheckCap.mockResolvedValue({ allowed: true, count: 0, cap: 25, isPro: false })
     mockCompute.mockReturnValue("COOLING")
     mockPrisma.jobListing.create.mockResolvedValue({
       id: "manual-3",

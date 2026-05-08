@@ -29,7 +29,8 @@ export async function importFromUrl(formData: FormData): Promise<ActionResult<Im
 
   const cap = await checkListingCap(userId)
   if (!cap.allowed) {
-    return { data: { status: "cap_reached", count: cap.count, cap: cap.cap }, error: null }
+    // cap.cap is non-null when allowed is false (Pro users always have allowed: true)
+    return { data: { status: "cap_reached", count: cap.count, cap: cap.cap! }, error: null }
   }
 
   const existing = await prisma.jobListing.findFirst({ where: { userId, sourceUrl: url, deletedAt: null } })
@@ -108,7 +109,8 @@ export async function importFromUrlForced(url: string): Promise<ActionResult<Imp
 
   const cap = await checkListingCap(userId)
   if (!cap.allowed) {
-    return { data: { status: "cap_reached", count: cap.count, cap: cap.cap }, error: null }
+    // cap.cap is non-null when allowed is false (Pro users always have allowed: true)
+    return { data: { status: "cap_reached", count: cap.count, cap: cap.cap! }, error: null }
   }
 
   const scraped = await scrapeJobListing(url, userId)
@@ -179,7 +181,8 @@ export async function manualImportListing(formData: FormData): Promise<ActionRes
 
   const cap = await checkListingCap(userId)
   if (!cap.allowed) {
-    return { data: { status: "cap_reached", count: cap.count, cap: cap.cap }, error: null }
+    // cap.cap is non-null when allowed is false (Pro users always have allowed: true)
+    return { data: { status: "cap_reached", count: cap.count, cap: cap.cap! }, error: null }
   }
 
   const parsed = manualImportSchema.safeParse({

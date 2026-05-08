@@ -6,6 +6,7 @@ import { Drawer } from "@base-ui/react"
 import { importFromUrl, importFromUrlForced, manualImportListing } from "@/actions/import-listing"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ProGatePattern } from "@/components/shared/ProGatePattern"
 
 type DrawerState =
   | { status: "idle" }
@@ -13,6 +14,7 @@ type DrawerState =
   | { status: "failed"; url: string; prefilledCompany?: string }
   | { status: "manual" }
   | { status: "duplicate"; existingId: string; title: string; company: string }
+  | { status: "cap_reached"; cap: number }
 
 type ImportDrawerProps = {
   open: boolean
@@ -91,8 +93,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
       const data = result.data
 
       if (data.status === "cap_reached") {
-        setErrorMessage(`You've reached the ${data.cap} listing limit for the free tier.`)
-        setState({ status: "idle" })
+        setState({ status: "cap_reached", cap: data.cap })
         return
       }
 
@@ -152,7 +153,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
         return
       }
       if (result.data.status === "cap_reached") {
-        setManualError(`You've reached the ${result.data.cap} listing limit for the free tier.`)
+        setState({ status: "cap_reached", cap: result.data.cap })
         return
       }
       if (result.data.status === "created") {
@@ -188,6 +189,14 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
               <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
                 {errorMessage}
               </p>
+            )}
+
+            {state.status === "cap_reached" && (
+              <ProGatePattern
+                headline={`You've reached ${state.cap} tracked listings`}
+                description="Free accounts are capped at this many active listings. Upgrade to Pro for unlimited tracking."
+                ctaText="Upgrade to Pro"
+              />
             )}
 
             {(state.status === "idle" || state.status === "loading") && (

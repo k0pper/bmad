@@ -1,14 +1,37 @@
 import { prisma } from "@/lib/db"
 
-export async function checkListingCap(
-  userId: string
-): Promise<{ allowed: boolean; count: number; cap: number }> {
-  const [count, configRow] = await Promise.all([
-    prisma.jobListing.count({ where: { userId, archived: false, deletedAt: null } }),
+export type ListingCapResult = {
+  /** True when the user can create another listing. */
+  allowed: boolean
+  /** Current count of non-archived, non-deleted listings. */
+  count: number
+  /** Free-tier cap. `null` for Pro users (no cap applies). */
+  cap: number | null
+  /** Whether the user is on the Pro tier. */
+  isPro: boolean
+}
+
+const DEFAULT_LISTING_CAP_FREE = 25
+
+export async function checkListingCap(userId: string): Promise<ListingCapResult> {
+  const [count, configRow, user] = await Promise.all([
+    prisma.jobListing.count({
+      where: { userId, archived: false, deletedAt: null },
+    }),
     prisma.appConfig.findUnique({ where: { key: "listing_cap_free" } }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { subscriptionTier: true },
+    }),
   ])
-  const cap = configRow ? parseInt(configRow.value, 10) : 25
-  return { allowed: count < cap, count, cap }
+
+  const isPro = user?.subscriptionTier === "PRO"
+  if (isPro) {
+    return { allowed: true, count, cap: null, isPro: true }
+  }
+
+  const cap = configRow ? parseInt(configRow.value, 10) : DEFAULT_LISTING_CAP_FREE
+  return { allowed: count < cap, count, cap, isPro: false }
 }
 
 export type CvVersionCapResult = {

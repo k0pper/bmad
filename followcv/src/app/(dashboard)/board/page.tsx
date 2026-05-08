@@ -4,10 +4,12 @@ import { getPreferenceProfile } from "@/lib/preferences/service"
 import { prisma } from "@/lib/db"
 import { BoardClient, type BoardListing } from "@/components/board/BoardClient"
 import { StalenessBanner } from "@/components/board/StalenessBanner"
+import { ListingCapBanner } from "@/components/board/ListingCapBanner"
 import {
   getFollowUpThresholdDays,
   isFollowUpDue,
 } from "@/lib/services/follow-up-detector"
+import { checkListingCap } from "@/lib/services/entitlement-service"
 import type { OverrideSource, VitalityState, ImportSource } from "@/generated/prisma/client"
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
@@ -37,7 +39,7 @@ export default async function BoardPage({
   const params = await searchParams
   const showArchived = params.archived === "true"
 
-  const [listings, user, cvVersionsRaw, followUpThresholdDays] = await Promise.all([
+  const [listings, user, cvVersionsRaw, followUpThresholdDays, listingCap] = await Promise.all([
     getBoardListings(session.user.id, showArchived),
     prisma.user.findUnique({ where: { id: session.user.id }, select: { lastVisitAt: true } }),
     prisma.cvVersion.findMany({
@@ -46,6 +48,7 @@ export default async function BoardPage({
       select: { id: true, name: true, uploadedAt: true },
     }),
     getFollowUpThresholdDays(),
+    checkListingCap(session.user.id),
   ])
 
   const previousVisitAt = user?.lastVisitAt ?? null
@@ -108,6 +111,9 @@ export default async function BoardPage({
   return (
     <div className="p-8">
       {hasStaleListings && <StalenessBanner />}
+      {!showArchived && !listingCap.isPro && listingCap.cap !== null && (
+        <ListingCapBanner count={listingCap.count} cap={listingCap.cap} />
+      )}
       <BoardClient
         listings={boardListings}
         cvVersions={cvVersions}

@@ -33,36 +33,70 @@ beforeEach(() => {
 })
 
 describe("checkListingCap", () => {
-  it("returns allowed: true when under cap", async () => {
+  it("returns allowed: true when under cap (free tier)", async () => {
     mockCount.mockResolvedValue(5)
     mockFindUnique.mockResolvedValue(null)
+    mockUserFindUnique.mockResolvedValue({ subscriptionTier: "FREE" })
 
     const result = await checkListingCap("user-1")
 
-    expect(result).toEqual({ allowed: true, count: 5, cap: 25 })
+    expect(result).toEqual({
+      allowed: true,
+      count: 5,
+      cap: 25,
+      isPro: false,
+    })
   })
 
-  it("returns allowed: false when at cap", async () => {
+  it("returns allowed: false when at cap (free tier)", async () => {
     mockCount.mockResolvedValue(25)
     mockFindUnique.mockResolvedValue(null)
+    mockUserFindUnique.mockResolvedValue({ subscriptionTier: "FREE" })
 
     const result = await checkListingCap("user-1")
 
-    expect(result).toEqual({ allowed: false, count: 25, cap: 25 })
+    expect(result).toEqual({
+      allowed: false,
+      count: 25,
+      cap: 25,
+      isPro: false,
+    })
   })
 
-  it("uses cap from AppConfig when present", async () => {
-    mockCount.mockResolvedValue(10)
-    mockFindUnique.mockResolvedValue({ key: "listing_cap_free", value: "50" })
+  it("Pro users always allowed regardless of count; cap is null", async () => {
+    mockCount.mockResolvedValue(500)
+    mockFindUnique.mockResolvedValue(null)
+    mockUserFindUnique.mockResolvedValue({ subscriptionTier: "PRO" })
 
     const result = await checkListingCap("user-1")
 
-    expect(result).toEqual({ allowed: true, count: 10, cap: 50 })
+    expect(result).toEqual({
+      allowed: true,
+      count: 500,
+      cap: null,
+      isPro: true,
+    })
+  })
+
+  it("uses cap from AppConfig when present (free tier)", async () => {
+    mockCount.mockResolvedValue(10)
+    mockFindUnique.mockResolvedValue({ key: "listing_cap_free", value: "50" })
+    mockUserFindUnique.mockResolvedValue({ subscriptionTier: "FREE" })
+
+    const result = await checkListingCap("user-1")
+
+    expect(result).toEqual({
+      allowed: true,
+      count: 10,
+      cap: 50,
+      isPro: false,
+    })
   })
 
   it("falls back to 25 when AppConfig row not found", async () => {
     mockCount.mockResolvedValue(0)
     mockFindUnique.mockResolvedValue(null)
+    mockUserFindUnique.mockResolvedValue({ subscriptionTier: "FREE" })
 
     const result = await checkListingCap("user-1")
 
@@ -72,6 +106,7 @@ describe("checkListingCap", () => {
   it("counts only non-archived non-deleted listings", async () => {
     mockCount.mockResolvedValue(3)
     mockFindUnique.mockResolvedValue(null)
+    mockUserFindUnique.mockResolvedValue({ subscriptionTier: "FREE" })
 
     await checkListingCap("user-1")
 
