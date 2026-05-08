@@ -90,10 +90,12 @@ So that I have a versioned history of my CVs to choose from when applying.
 The architecture document and earlier story drafts referenced Cloudflare R2 + AWS SDK v3 with pre-signed PUT/GET URLs. **This story diverges from that on cost grounds.** The project switches to Vercel Blob, configured as a **private** store:
 
 - ✅ **Pros:** zero infrastructure setup, native Vercel integration, single env var, simpler client-upload SDK, free tier on Hobby plan.
-- ✅ **Private blobs satisfy FR34 cleanly:** every URL the SDK returns carries a short-lived signature minted with the server-side `BLOB_READ_WRITE_TOKEN`. There is no public bucket access. Mint a fresh URL on each download via `head()`.
-- ⚠️ **Operational gotcha** (also recorded in `project-context.md`): the upload SDK call must declare `access: "private"` to match the store. `access: "public"` returns `bad_request: Cannot use public access on a private store`. Likewise, do not store and re-serve the URL returned at upload time — the signature on that URL expires; always re-mint via `head()` on download.
+- ✅ **Private blobs satisfy FR34's intent** (per-request authenticated access) by being inaccessible to the browser without the server's token. There is no public bucket; reads are served via an authenticated same-origin proxy that streams via `get(s3Key, { access: "private" })`.
+- ⚠️ **Operational gotchas** (also recorded in `project-context.md`):
+  - The upload SDK call must declare `access: "private"` to match the store. `access: "public"` returns `bad_request: Cannot use public access on a private store`.
+  - Vercel Blob v2 has **no browser-usable signed-URL form for private blobs**. Earlier drafts of this story assumed `head().url` could be opened directly; it returns 403. The final design uses a same-origin proxy route at `/api/cv/[id]/file` that auth-checks, ownership-checks, then streams the bytes via `get(... access: "private")`. The blob URL never leaves the server.
 
-The architecture.md document still references R2 in several places. **Do not** attempt to update architecture.md from this story — that's a separate planning-artifact rewrite and out of scope. The Story 3.1 spec and `project-context.md` are the binding sources of truth for implementers; architecture.md is treated as historical context until an explicit revisit.
+**2026-05-08 update:** architecture.md was retroactively rewritten in a follow-up reconciliation pass to match the shipped Vercel Blob reality (storage section, upload-flow gap-resolution, and cross-references). Two intentional historical mentions remain in architecture.md to explain *why* the swap happened. project-context.md and the implementation specs remain the binding sources of truth.
 
 ### PDF preview cards — why react-pdf, not iframe or server-side thumbnails
 

@@ -8,6 +8,17 @@ Started: 2026-05-08 (late evening). Working through remaining Epic 3+ stories on
 
 Epics 6 (Gmail OAuth) and 7 (Admin tooling) were intentionally not started: Epic 6 needs Google OAuth credentials + an encryption-at-rest key + Gmail API quota review, and Epic 7 is internal-only tooling whose value depends on user volume. Both are good follow-ups whenever you want to pick them up.
 
+## R2 → Vercel Blob doc reconciliation (2026-05-08)
+
+Followed up on the planning docs to bring them in sync with the shipped Vercel-Blob-based reality:
+
+- **`followcv/.env.example`** — replaced the R2 block (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, etc.) with the actually-used `BLOB_READ_WRITE_TOKEN` Vercel Blob token. Added the four Stripe env vars (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID`, `APP_URL`) the codebase reads. Removed `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — server-side checkout doesn't need it. **Re-pull `.env.local` if you've already configured Stripe via `vercel env pull`** so the new vars land.
+- **`_bmad-output/planning-artifacts/architecture.md`** — storage section, gap-resolution paragraph, project-structure tree, integration-list, NFR mapping, and validation checklist all rewritten to reflect Vercel Blob + `router.refresh()`. Two intentional historical mentions remain (the "Important Decisions" line and the "CV file upload path" gap-resolution paragraph) explaining *why* the swap happened.
+- **`_bmad-output/planning-artifacts/epics.md`** — AR5 (storage configuration), AR9 (Server Action contract / cache invalidation), FR33–34 (CV snapshot via Vercel Blob), Story 3.1 AC (upload flow), Story 3.3 AC (snapshot service + sequencing + cache pattern), Story 3.5 AC (proxy-not-signed-URL), Story 7.4 AC (export blob storage), Story 7.5 AC (cleanup reuses `deleteAccount`).
+- **`_bmad-output/implementation-artifacts/3-1-cv-upload-and-version-history.md`** — removed the "do not update architecture.md" caveat (no longer applicable); rewrote the "every URL the SDK returns carries a signature" misconception to reflect the final proxy-based design.
+
+The codebase itself was already correct — no R2/AWS-SDK references in `followcv/src/`, no stale package deps. This was purely a planning-doc reconciliation.
+
 ## Stories shipped tonight
 
 - **3.3 — Record Application with CV Snapshot** ✅ (+8 commits, 9 files, 14 tests; schema cascade migration + apply-to-job action + ApplyRitualDialog + Board wiring + account-deletion blob cleanup)
@@ -68,7 +79,7 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, "updatedAt" = now();
 ## Reviews / known concerns
 
 - **Concurrent delete races on shared CvSnapshot blobs** — two unrelated open issues from Story 3.2's review remain in `_bmad-output/implementation-artifacts/deferred-work.md`. They need a future blob-reaper job; out of scope for these stories.
-- **Story 3.3 architecture document still references Cloudflare R2 + `revalidateTag`** in places — by deliberate decision, that doc is treated as historical context and not updated per-story. The binding doc is `followcv/project-context.md`.
+- ~~Story 3.3 architecture document still references Cloudflare R2 + `revalidateTag`.~~ **Resolved 2026-05-08:** architecture.md and epics.md were rewritten to reflect Vercel Blob + `router.refresh()` reality across all relevant sections. Two intentional historical mentions remain in architecture.md (the "Important Decisions" line and the "CV file upload path" gap-resolution paragraph) explaining why the swap happened.
 
 ### Epic 4 + 5 stories shipped
 
@@ -103,5 +114,5 @@ After shipping Story 5.2 I ran an adversarial review of the Stripe code. **Patch
 ### Carried-over follow-ups
 
 - **Story 5.2 over-cap downgrade UX** — when a user cancels Pro and ends up over the listing cap, the spec says the board should render listings read-only with a prompt to archive. Not implemented in the autonomous run; the cap blocking on imports already works (`checkListingCap`), but the read-only board treatment is a focused follow-up. ~½ day.
-- **Architecture document still references Cloudflare R2 and `revalidateTag`** — by deliberate decision; not updated per-story.
+- ~~Architecture document still references Cloudflare R2 and `revalidateTag`.~~ **Resolved 2026-05-08** — see the "R2 → Vercel Blob doc reconciliation" section near the top.
 - **Two blob-orphan races from Story 3.2 review** — still in `_bmad-output/implementation-artifacts/deferred-work.md`, awaiting a future blob-reaper job.

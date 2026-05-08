@@ -107,11 +107,11 @@ AR1: Initialize project with `npx create-next-app@latest followcv --typescript -
 AR2: Configure Neon (Serverless Postgres) as database host with Prisma ORM; set up Prisma schema with all application models and enums; configure connection pooling via Neon serverless driver
 AR3: Configure Auth.js v5 with Google OAuth provider and JWT session strategy; implement dedicated GmailToken table with AES-256-GCM encryption for refresh token storage; enforce 24-hour idle session expiry
 AR4: Configure pg-boss durable job queue on Neon Postgres; implement Vercel Cron integration via `api/jobs/process/route.ts` as the polling target; register all job types with 3× retry and exponential backoff
-AR5: Configure Cloudflare R2 for CV file storage; implement direct upload flow (client requests pre-signed PUT URL from Server Action → client PUTs directly to R2 → client calls confirmation Server Action to create CvSnapshot DB record); implement pre-signed GET URL helpers with 15-minute expiry
+AR5: Configure **Vercel Blob** (private store) for CV file storage; implement direct upload flow via `@vercel/blob/client`'s `upload()` against an `/api/cv/upload-token` route that wraps `handleUpload({ onBeforeGenerateToken })` for auth + cap checks → client calls a confirmation Server Action to create the `CvVersion` DB row; implement same-origin proxy routes for browser-facing reads (`/api/cv/[id]/file` and `/api/cv/snapshot/[id]/file`) that auth-check, ownership-check, then stream via `get(s3Key, { access: "private" })`. Vercel Blob v2 has no browser-usable signed-URL form for private blobs, which is why the proxy is the only viable read path. (Original draft specified Cloudflare R2 + AWS SDK v3 pre-signed URLs; swapped during Story 3.1 — see project-context.md.)
 AR6: Configure Stripe SDK; implement webhook Route Handler at `api/webhooks/stripe/route.ts` with signature verification; connect webhook to entitlement-service for subscription tier updates
 AR7: Set up Sentry error tracking (instrumentation.ts) and Vercel Analytics in root layout; configure source map uploads on deploy
 AR8: Set up GitHub Actions CI/CD pipeline: typecheck, ESLint, Vitest unit tests, Prisma migrate --create-only dry-run on PR; Playwright E2E on staging post-deploy
-AR9: All Server Actions must enforce auth session check at entry and return `ActionResult<T> = { data: T; error: null } | { data: null; error: string }` — never throw; all post-mutation Server Actions call revalidateTag before returning
+AR9: All Server Actions must enforce auth session check at entry and return `ActionResult<T> = { data: T; error: null } | { data: null; error: string }` — never throw. Post-mutation cache invalidation is via `router.refresh()` from the calling client (Server Components re-query Prisma directly). The original draft specified `revalidateTag`; the codebase consolidated on `router.refresh()` — see project-context.md → "Cache invalidation".
 AR10: entitlement-service must always read subscription tier from DB (never trust JWT alone); `checkListingCap(userId)` must be called in every Server Action that creates a JobListing
 AR11: vitality-state-machine.ts is the sole permitted writer of vitalityState on JobListing; all other code calls this service — direct Prisma writes to vitalityState are forbidden
 AR12: CvSnapshot records are write-once; cv-snapshot-service.ts is the only creator of CvSnapshot records; S3 keys derived from snapshotId are never reused
@@ -174,8 +174,8 @@ FR29: Epic 3 — Notes on applications and listings
 FR30: Epic 3 — Upload CV as named, timestamped version
 FR31: Epic 3 — View CV version history
 FR32: Epic 3 — Restore, duplicate, rename CV version
-FR33: Epic 3 — Immutable CV snapshot on apply (write-once, R2)
-FR34: Epic 3 — CV files via expiring authenticated pre-signed URLs
+FR33: Epic 3 — Immutable CV snapshot on apply (write-once, Vercel Blob)
+FR34: Epic 3 — CV files via authenticated same-origin proxy (private Vercel Blob store)
 FR35: Epic 3 — Free tier CV version cap enforcement
 FR40: Epic 4 — Health Score from 5 rule-based indicators
 FR41: Epic 4 — 3-zone display (🟢/🟡/🔴) + cascading recalculation
@@ -476,11 +476,11 @@ So that I have a versioned history of my CVs to choose from when applying.
 
 **Given** a user navigates to the CV section,
 **When** they upload a PDF file (up to 10MB),
-**Then** the upload uses the direct R2 flow: a Server Action returns a pre-signed PUT URL → the client PUTs directly to Cloudflare R2 → a confirmation Server Action creates a `CvVersion` record with `userId`, `name`, `uploadedAt`, `s3Key` (derived from `cvVersionId`), and `fileSize`
+**Then** the upload uses Vercel Blob's client-upload flow: the client calls `upload()` from `@vercel/blob/client` against `/api/cv/upload-token` (the route auth-checks and runs the cap check inside `onBeforeGenerateToken` before returning a token) → the browser PUTs the bytes directly to Vercel Blob → the client calls a `confirmCvUpload({ blobUrl, name, fileSize, fileHash })` Server Action which creates the `CvVersion` row with `s3Key = blobUrl`. The `s3Key` column is a misnomer kept from the original R2 draft — it now stores the Vercel Blob URL.
 **And** the upload completes without timeout for files up to 10MB
 **And** the user is prompted to give the version a name (default: "CV — {date}") before confirming
 **And** the `CVVersionSelector` component lists all versions with name, upload date, file size, and an "active" indicator for the most recently uploaded
-**And** CV files are served exclusively via Server-Action-generated pre-signed GET URLs (15-minute expiry); no direct bucket access exists
+**And** CV files are served exclusively via the authenticated same-origin proxy at `/api/cv/[id]/file` (Vercel Blob v2 has no browser-usable signed-URL form for private blobs — direct browser navigation returns 403). The proxy auth-checks, ownership-checks, and streams via `get(s3Key, { access: "private" })`. A `?download=1` query flips `Content-Disposition` between `inline` and `attachment`. The blob URL never leaves the server.
 **And** free tier users are shown their current version count against the configured cap; uploading when at cap returns `{ data: null, error: "CV version limit reached — upgrade to Pro for unlimited versions" }`
 
 ### Story 3.2: CV Version Management
@@ -508,11 +508,11 @@ So that I always know exactly which CV version a company received.
 
 **Given** a user opens the `ApplyRitualDialog` from a `BoardRow`,
 **When** they complete the apply flow,
-**Then** the dialog shows: `CVVersionSelector` (required), application date (default: today), optional notes, and optional supporting document upload
-**And** confirming the apply action calls the `apply-to-job` Server Action which: (1) calls `cv-snapshot-service.ts` to create an immutable `CvSnapshot` — a new R2 object copied from the source `CvVersion` with key `cv/{userId}/{snapshotId}.pdf` — and creates the `CvSnapshot` DB record, (2) creates the `Application` record with FK to both the `JobListing` and `CvSnapshot`, (3) calls `vitality-state-machine.ts` to transition the listing to `ACTIVE`
-**And** the entire apply action is atomic: if the snapshot creation fails, the `Application` record is not created
+**Then** the dialog shows: `CVVersionSelector` (required), application date (default: today), and optional notes. (The original epic also mentioned an optional supporting-document upload; deferred during Story 3.3 — there is no `SupportingDocument` model and no UX detail.)
+**And** confirming the apply action calls the `apply-to-job` Server Action which sequences: (1) `cv-snapshot-service.createSnapshot()` reads the source `CvVersion` blob via `get()` and writes a fresh, immutable copy via `put()` to `cv/{userId}/{uuid}.pdf` in Vercel Blob — Vercel Blob v2 has no native server-side `copy()`; (2) creates the `CvSnapshot` row pointing at the new blob URL; (3) creates the `Application` row with FKs to both the `JobListing` and `CvSnapshot`; (4) calls `vitality-state-machine.computeVitalityState()` and updates the listing if the state changed.
+**And** the apply action is "atomic enough" via sequenced cleanup (Neon HTTP forbids transactions): if any DB write fails after the blob is written, the orphan blob is `del()`'d and any orphan snapshot row is deleted. Snapshot is created before Application, so the original epic constraint "if snapshot creation fails, Application is not created" is automatically satisfied by the sequence.
 **And** the apply flow is fully keyboard-navigable: Tab through fields, Enter to confirm
-**And** after the apply action completes the `BoardRow` updates optimistically to reflect `ACTIVE` state before the server revalidation
+**And** after the apply action completes the dialog calls `router.refresh()`; the Server Component re-fetches and the `BoardRow` re-renders showing the ACTIVE vitality and the "Applied" indicator. (The original epic mentioned "optimistic" updates; the codebase consolidated on `await action; router.refresh()` across every Board mutation — see project-context.md.)
 
 ### Story 3.4: Application Status Management & Notes
 
@@ -539,10 +539,10 @@ So that I always know which version a company received, even if my CV has change
 
 **Given** a user views a listing with a recorded application,
 **When** they click "View CV sent",
-**Then** a Server Action generates a fresh pre-signed GET URL for the `CvSnapshot` file and opens it in a new tab
+**Then** the link opens the snapshot in a new tab via the same-origin proxy at `/api/cv/snapshot/[id]/file` (with `?download=1` for the Download variant). The proxy auth-checks via the Application → JobListing → userId join (CvSnapshot has no `userId` column), then streams via `get(s3Key, { access: "private" })`. (The original epic said "pre-signed GET URL"; Vercel Blob v2 has no browser-usable signed-URL form for private blobs, so the proxy is the only viable read path.)
 **And** the snapshot file is the immutable point-in-time copy — not the current version of the source CV
-**And** `CvSnapshot` records cannot be modified after creation; any attempt to update a snapshot record returns an error
-**And** if the snapshot file is missing from R2, the UI surfaces "Snapshot unavailable" gracefully rather than a broken link
+**And** `CvSnapshot` records cannot be modified after creation; the schema has no update path and the cv-snapshot-service is the only write site
+**And** if the snapshot file is missing from storage, the proxy returns 404 and the UI surfaces "Snapshot unavailable" gracefully rather than a broken link
 **And** the application detail view labels the attached file with the version name sent (e.g., "CV sent: Senior Frontend — v3")
 
 ### Story 3.6: Follow-up Due Detection
@@ -756,8 +756,8 @@ So that I can exercise my right to data portability under GDPR.
 **When** the request is submitted,
 **Then** a Server Action enqueues a `gdpr/export` pg-boss job for the authenticated user's ID
 **And** the export job (`gdpr-export-processor.ts`) collects: all `JobListing` records, all `CvSnapshot` metadata (not binary content), all `AuditLog` entries, and the `User` profile record (excluding password hash)
-**And** the export is assembled as a single JSON file and uploaded to R2 at `exports/{userId}/{timestamp}.json` with a 7-day expiry
-**And** a pre-signed R2 download URL (1-hour expiry) is sent to the user's registered email address via the notification service
+**And** the export is assembled as a single JSON file and uploaded to Vercel Blob at `exports/{userId}/{timestamp}.json` (private store, same as CV files)
+**And** a download link to a same-origin proxy route (`/api/exports/[id]/file`, auth-scoped to the requesting user, 7-day TTL enforced at the application layer) is emailed to the user's registered address via the notification service
 **And** if the export job fails, it is retried up to 3× per the standard pg-boss retry policy; on permanent failure the user receives an email notification to contact support
 **And** the user can submit at most one export request per 24-hour window; subsequent requests within the window display: "Your export is being prepared. You'll receive an email with the download link."
 **And** when the export job is enqueued, a record is written to `AuditLog` with `source: USER_EXPORT_REQUEST`, `userId`, and `requestedAt` timestamp for GDPR compliance (FR53)
@@ -773,7 +773,7 @@ So that we minimise data retention and comply with GDPR data minimisation princi
 **Given** the `gdpr/cleanup-inactive-accounts` Vercel Cron job fires (weekly schedule),
 **When** `gdpr-cleanup-processor.ts` runs,
 **Then** it identifies all users where `User.lastActiveAt < NOW() - INTERVAL '2 years'` AND `User.subscriptionTier = 'FREE'`
-**And** for each identified user: all `JobListing` records are soft-deleted (`deletedAt` timestamp set), all `CvSnapshot` R2 objects are deleted, `User.email` is replaced with a hashed placeholder (`sha256(email) + '@anonymised.invalid'`), and `User.isActive` is set to `false`
+**And** for each identified user: all `JobListing` records are soft-deleted (`deletedAt` timestamp set), all `CvVersion` and `CvSnapshot` blobs in Vercel Blob are deleted (the existing `deleteAccount` cleanup logic is reused — see `src/lib/account/service.ts`), `User.email` is replaced with a hashed placeholder (`sha256(email) + '@anonymised.invalid'`), and `User.isActive` is set to `false`
 **And** the user's `GmailToken` (if any) is deleted
 **And** each anonymisation is recorded in `AuditLog` with `source: GDPR_CLEANUP` and the count of affected records
 **And** Pro users are never subject to automated cleanup regardless of inactivity period

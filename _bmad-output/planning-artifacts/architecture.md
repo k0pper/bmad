@@ -27,9 +27,9 @@ Architectural weight is unevenly distributed. The Vitality State Machine (FR16�
 
 **Non-Functional Requirements:**
 - Performance: 2s board load p95, 500ms API p95, 5s max import — prohibit synchronous heavy lifting on the request path; pagination and query optimization are non-optional
-- Security: NextAuth.js session management, read-only Gmail OAuth with minimal scope, S3 pre-signed URLs (no public bucket), GDPR right-to-erasure and data export pipeline
+- Security: NextAuth.js session management, read-only Gmail OAuth with minimal scope, private object store served via authenticated same-origin proxy (no public delivery URLs), GDPR right-to-erasure and data export pipeline
 - Scalability: 5,000 concurrent users at 25% WAU — Vercel serverless + managed Postgres is sufficient, but connection pooling (PgBouncer/Neon) is required from the start
-- Reliability: Zero data loss on CV snapshots (S3 durability), pg-boss dead-letter queue for failed jobs, 3× retry with exponential backoff on all background tasks
+- Reliability: Zero data loss on CV snapshots (Vercel Blob durability), pg-boss dead-letter queue for failed jobs, 3× retry with exponential backoff on all background tasks
 - Accessibility: WCAG 2.1 Level AA — must inform component-level decisions, not be retrofitted
 
 **Scale & Complexity:**
@@ -43,7 +43,7 @@ Architectural weight is unevenly distributed. The Vitality State Machine (FR16�
 - **Runtime**: Next.js App Router (App directory, Server Components, Server Actions)
 - **Deployment**: Vercel (serverless functions, Edge Config for feature flags)
 - **Job Queue**: pg-boss — durable, Postgres-backed; 3× retry, exponential backoff, DLQ
-- **Object Storage**: S3-compatible (CV snapshots, immutable, pre-signed delivery)
+- **Object Storage**: Vercel Blob (private store) — CV versions and per-application snapshots; delivery via authenticated same-origin proxy routes (Vercel Blob v2 has no browser-usable signed-URL form for private blobs)
 - **Auth**: NextAuth.js (Google OAuth for login, separate Gmail OAuth scope for email access)
 - **Payments**: Stripe (subscription management, webhook-driven entitlement updates)
 - **UI**: shadcn/ui + Tailwind CSS v3 on Radix UI primitives; Inter typeface; indigo-600 brand
@@ -53,7 +53,7 @@ Architectural weight is unevenly distributed. The Vitality State Machine (FR16�
 1. **Authentication & Authorization** — session-based auth via NextAuth.js with route-level and data-level enforcement; Gmail OAuth token refresh lifecycle separate from login session
 2. **Durable Background Jobs** — vitality aging, staleness detection, deadline warnings, and Gmail ingestion all depend on pg-boss reliability; job failure must not silently corrupt board state
 3. **Feature Flag / Entitlement Enforcement** — freemium 25-listing cap must be enforced at the service layer, not UI; Vercel Edge Config for flag delivery
-4. **Immutable Object Storage** — CV snapshots must be write-once, never overwritten; pre-signed URL generation is the only delivery mechanism
+4. **Immutable Object Storage** — CV snapshots must be write-once, never overwritten; delivery via authenticated same-origin proxy is the only mechanism (Vercel Blob private store)
 5. **GDPR Compliance Pipeline** — data export (FR55) and erasure (FR56) are architectural obligations crossing every data domain
 6. **Audit Logging** — application-of-record actions (apply, archive, CV upload) require an append-only log for integrity and debugging
 7. **Optimistic UI with Server Revalidation** — real-time-feel board without WebSockets; requires consistent cache invalidation strategy across Server Components and mutations
@@ -127,10 +127,10 @@ Turbopack HMR, TypeScript path aliases (`@/*`), ESLint with Next.js rules, AGENT
 - Mutation Pattern: Server Actions + Route Handlers split (see API section)
 
 **Important Decisions (Shape Architecture):**
-- Caching: next/cache with revalidateTag — covers the 2s board load target without external infra
+- Caching: `router.refresh()` from clients after Server-Action mutations (Server Components re-query Prisma directly). The original plan was `next/cache` + `revalidateTag` but the codebase consolidated on `router.refresh()`; see project-context.md → "Cache invalidation".
 - Validation: Zod — universal, shared schemas between client and server
 - Client State: useOptimistic + useState — keeps client bundle lean per Marcus's lightweight preference
-- S3 Provider: Cloudflare R2 — zero egress fees, S3-compatible API, Vercel integration
+- Object storage: **Vercel Blob (private store)** — zero infra setup, native Vercel integration, single env var. Original plan (Cloudflare R2 + AWS SDK v3 + pre-signed URLs) was swapped during Story 3.1 implementation on cost-of-setup grounds; see project-context.md → "Object storage — Vercel Blob".
 - Testing: Vitest + Testing Library + Playwright
 
 **Deferred Decisions (Post-MVP):**
@@ -172,11 +172,14 @@ Turbopack HMR, TypeScript path aliases (`@/*`), ESLint with Next.js rules, AGENT
 - Revocation: full row delete on Gmail disconnect or GDPR erasure
 - Affects: Gmail OAuth callback handler, pg-boss email ingestion jobs, GDPR erasure pipeline
 
-**S3 Pre-Signed URLs: Cloudflare R2**
-- All CV file delivery via pre-signed URLs (15-minute expiry)
-- No public bucket access — URLs generated server-side on demand
-- File key format: `cv/{userId}/{snapshotId}.pdf` — immutable, never overwritten
-- Affects: CV upload Server Action, CV download Server Component, GDPR export pipeline
+**Object storage: Vercel Blob (private store)**
+- CV files and per-application snapshots live in a private Vercel Blob store (`access: "private"`).
+- Vercel Blob v2 does **not** expose a browser-usable signed-URL form for private blobs (`head().url` returns 403 when opened directly). All browser-facing reads — preview, download, thumbnail — go through a same-origin proxy route that auth-checks, ownership-checks, and streams via `get(s3Key, { access: "private" })`.
+- CV uploads use Vercel Blob's client-upload flow (`@vercel/blob/client`'s `upload()` → token route wrapping `handleUpload({ onBeforeGenerateToken })` for auth + cap checks). Direct browser → Blob, bypassing the Vercel function body limit.
+- CV snapshot creation is server-only: read source via `get()` → `put()` to a fresh `cv/{userId}/{uuid}.pdf` path. Vercel Blob v2 has no native server-side `copy()`.
+- Snapshot key format: `cv/{userId}/{uuid}.pdf` — immutable, never overwritten.
+- Affects: CV upload-token route, CV upload Server Action, snapshot service, same-origin proxy routes, GDPR export pipeline.
+- Single env var: `BLOB_READ_WRITE_TOKEN` (Vercel-injected when a Blob store is connected).
 
 ### API & Communication Patterns
 
@@ -243,8 +246,8 @@ Turbopack HMR, TypeScript path aliases (`@/*`), ESLint with Next.js rules, AGENT
 2. Auth.js v5 configuration (Google OAuth, JWT strategy)
 3. pg-boss initialization on Neon connection
 4. Core vitality state machine (FR16–21) — highest risk, implement first
-5. CV snapshot pipeline (S3/R2 + Prisma) — second highest risk
-6. Board UI (Server Components + revalidateTag cache)
+5. CV snapshot pipeline (Vercel Blob + Prisma) — second highest risk
+6. Board UI (Server Components + `router.refresh()`)
 7. Health Score engine
 8. Gmail OAuth + token storage
 9. Stripe subscription + entitlement enforcement
@@ -308,9 +311,8 @@ src/
     db/           # Prisma client singleton
     auth/         # Auth.js v5 config
     schemas/      # Zod schemas (shared client + server)
-    services/     # Business logic services
+    services/     # Business logic services (incl. cv-snapshot-service: Vercel Blob get→put copy)
     jobs/         # pg-boss job definitions and handlers
-    s3/           # Cloudflare R2 client + pre-signed URL helpers
     stripe/       # Stripe SDK client + webhook verification
     utils/        # Date formatting, error utilities
 ```
@@ -511,7 +513,7 @@ followcv/
     │   │   ├── gmail-signal-processor.ts    # FR22–29: Email → vitality signal
     │   │   ├── entitlement-service.ts       # FR44–48: checkListingCap, tier checks
     │   │   ├── entitlement-service.test.ts
-    │   │   ├── cv-snapshot-service.ts       # FR30–39: R2 upload + Prisma snapshot
+    │   │   ├── cv-snapshot-service.ts       # FR30–39: Vercel Blob get→put copy (no Prisma write here)
     │   │   ├── cv-snapshot-service.test.ts
     │   │   ├── gdpr-export-service.ts       # FR55: Full data export assembly
     │   │   └── scraper-service.ts           # FR10–15: URL metadata extraction
@@ -521,8 +523,6 @@ followcv/
     │   │   ├── deadline-alerts.ts      # FR19: Deadline warning jobs
     │   │   ├── gmail-ingestion.ts      # FR22–29: Fetch + process email signals
     │   │   └── stripe-sync.ts          # FR44–48: Subscription state reconciliation
-    │   ├── s3/
-    │   │   └── index.ts                # Cloudflare R2 client + pre-signed URL helpers
     │   ├── stripe/
     │   │   └── index.ts                # Stripe SDK client + webhook signature verify
     │   └── utils/
@@ -536,7 +536,7 @@ followcv/
 
 **State Machine Boundary:** `src/lib/services/vitality-state-machine.ts` is the only file permitted to write `vitalityState` on `JobListing`. All other code calls this service.
 
-**CV Immutability Boundary:** `src/lib/services/cv-snapshot-service.ts` is the only file that creates `CvSnapshot` records — write-once, R2 key derived from `snapshotId`.
+**CV Immutability Boundary:** Snapshot creation is split: `src/lib/services/cv-snapshot-service.ts` performs the Vercel Blob `get → put` copy and returns the new URL + a fresh UUID; `src/actions/apply-to-job.ts` is the only Server Action that creates `CvSnapshot` rows (write-once) and owns the cleanup ordering on failure. Snapshot blob path is `cv/{userId}/{uuid}.pdf`.
 
 **Job Queue Boundary:** All pg-boss job definitions and handlers live in `src/lib/jobs/`. The Vercel Cron target (`api/jobs/process/route.ts`) triggers polling. Direct `boss.send()` outside this directory is discouraged — use typed job helpers from `src/lib/jobs/index.ts`.
 
@@ -567,7 +567,7 @@ followcv/
 - Google OAuth: Auth.js v5 provider
 - Gmail API: `gmail-token-service.ts` + `gmail-signal-processor.ts` (read-only, scoped)
 - Stripe: `api/webhooks/stripe/route.ts` → `lib/stripe/` → `entitlement-service.ts`
-- Cloudflare R2: `lib/s3/` (S3-compatible SDK, pre-signed URLs only)
+- Vercel Blob (private store): used directly via `@vercel/blob` (`get`, `put`, `del`); browser-facing reads go through same-origin proxy routes (`api/cv/[id]/file`, `api/cv/snapshot/[id]/file`)
 - Sentry: `instrumentation.ts` + automatic Next.js SDK instrumentation
 - Vercel Cron: triggers `api/jobs/process` on schedule for pg-boss job polling
 
@@ -577,10 +577,9 @@ User action (click)
   → useTransition(serverAction)
   → Server Action (auth check → Zod validate → service call)
   → Service (business logic → Prisma write)
-  → revalidateTag(cache tags)
   → return ActionResult<T>
-  → useOptimistic resolves / reverts
-  → Next.js revalidates Server Component cache
+  → caller calls router.refresh()  ← project-context.md binds this, not revalidateTag
+  → Server Component re-queries Prisma directly
   → Board re-renders with fresh data
 ```
 
@@ -588,9 +587,9 @@ User action (click)
 
 ### Coherence Validation ✅
 
-**Decision Compatibility:** All technology choices are mutually compatible. Next.js 16 + Prisma + Auth.js v5 + pg-boss + Neon + Tailwind v4 + shadcn/ui have no version conflicts. Cloudflare R2's S3-compatible API works with the standard AWS SDK v3.
+**Decision Compatibility:** All technology choices are mutually compatible. Next.js 16 + Prisma + Auth.js v5 + pg-boss + Neon + Tailwind v4 + shadcn/ui have no version conflicts. Vercel Blob ships native to the Vercel platform with a single env var.
 
-**Pattern Consistency:** Server Actions → typed return union is the correct App Router pattern. revalidateTag strategy is compatible with Server Component caching. VitalityState enum usage is consistent with Prisma codegen output. Service layer separation enables testability without pattern conflicts.
+**Pattern Consistency:** Server Actions → typed return union is the correct App Router pattern. `router.refresh()` after Server-Action mutations is the consistent cache-invalidation pattern across every surface (Board, CV, Settings, Subscription) — Server Components re-query Prisma on every render, no `revalidateTag` plumbing required. VitalityState enum usage is consistent with Prisma codegen output. Service layer separation enables testability without pattern conflicts.
 
 **Structure Alignment:** Project structure supports all decisions. pg-boss job isolation in `src/lib/jobs/` cleanly separates job definitions from business logic. Boundary rules prevent cross-contamination between domains.
 
@@ -599,10 +598,10 @@ User action (click)
 **Functional Requirements:** All 56 FRs across 8 categories are architecturally covered with explicit mappings to files and services (see Requirements to Structure Mapping table).
 
 **Non-Functional Requirements:**
-- P1–P5 (Performance): next/cache revalidateTag + Neon connection pooling targets 2s board load p95
-- S1–S8 (Security): JWT sessions, Gmail token AES-256-GCM encryption, R2 pre-signed URLs, Stripe webhook verification, GDPR pipeline
+- P1–P5 (Performance): `router.refresh()` + Neon connection pooling targets 2s board load p95
+- S1–S8 (Security): JWT sessions, Gmail token AES-256-GCM encryption, Vercel Blob private store served via authenticated same-origin proxy, Stripe webhook verification, GDPR pipeline
 - SC1–SC4 (Scalability): Vercel serverless auto-scales, Neon managed pooling, Vercel Cron handles job scheduling
-- R1–R4 (Reliability): pg-boss 3× retry + DLQ, R2 object durability, `CvSnapshot` write-once semantics
+- R1–R4 (Reliability): pg-boss 3× retry + DLQ, Vercel Blob durability, `CvSnapshot` write-once semantics, idempotent Stripe webhook via `stripe_webhook_events` dedup
 - A1–A4 (Accessibility): Radix UI accessible primitives via shadcn/ui, WCAG 2.1 AA target
 
 ### Gap Analysis Results
@@ -613,13 +612,13 @@ Resolution: Vercel Cron Jobs call `POST /api/jobs/process` Route Handler on sche
 
 **Important Gap — RESOLVED: CV file upload path**
 Vercel serverless functions have a 4.5MB body size limit — insufficient for CV PDFs.
-Resolution: **Direct upload via pre-signed R2 PUT URL** (Option A selected).
+Resolution: **Direct upload via Vercel Blob's client-upload flow** (the project switched from the original R2 + AWS-SDK pre-signed plan during Story 3.1; see project-context.md → "Object storage — Vercel Blob").
 
 Flow:
-1. Client calls Server Action → receives pre-signed R2 PUT URL (15-min expiry)
-2. Client PUTs file directly to R2 — bypasses Vercel entirely
-3. Client calls confirmation Server Action → creates `CvSnapshot` DB record
-4. `cv-snapshot-service.ts` updated to support this two-step flow
+1. Client calls `upload()` from `@vercel/blob/client` with `handleUploadUrl: "/api/cv/upload-token"` (token route does `auth()` + cap check inside `onBeforeGenerateToken`).
+2. Client PUTs file directly to Vercel Blob — bypasses the Vercel function body limit.
+3. On successful PUT, the client calls `confirmCvUpload({ blobUrl, name, fileSize, fileHash })` Server Action → creates the `CvVersion` DB row.
+4. Snapshot creation on apply (`cv-snapshot-service.ts` + `apply-to-job` action) is server-only: read source blob via `get()`, write a fresh copy via `put()` to `cv/{userId}/{uuid}.pdf`.
 
 **Important Gap — RESOLVED: JWT / subscription tier freshness**
 JWT may contain stale `subscriptionTier` after a Stripe webhook updates the DB.
@@ -630,25 +629,25 @@ Resolution: `entitlement-service.ts` always reads subscription tier from DB. JWT
 **Requirements Analysis**
 - [x] Project context thoroughly analyzed
 - [x] Scale and complexity assessed (Medium-High, ~12 domain boundaries)
-- [x] Technical constraints identified (Next.js, Vercel, pg-boss, S3, Auth.js, Stripe)
+- [x] Technical constraints identified (Next.js, Vercel, pg-boss, Vercel Blob, Auth.js, Stripe)
 - [x] Cross-cutting concerns mapped (7 concerns documented)
 
 **Architectural Decisions**
 - [x] Critical decisions documented with technology choices
-- [x] Technology stack fully specified (Next.js 16.2.4, Prisma, Neon, Auth.js v5, R2, Stripe)
+- [x] Technology stack fully specified (Next.js 16.2.4, Prisma, Neon, Auth.js v5, Vercel Blob, Stripe)
 - [x] Integration patterns defined (Server Actions, Route Handlers, Vercel Cron)
-- [x] Performance considerations addressed (next/cache, revalidateTag, connection pooling)
+- [x] Performance considerations addressed (`router.refresh()`, Neon connection pooling)
 
 **Implementation Patterns**
 - [x] Naming conventions established (DB, pg-boss jobs, files, API routes)
 - [x] Structure patterns defined (service layer, actions layer, component hierarchy)
-- [x] Communication patterns specified (ActionResult<T>, revalidateTag order)
+- [x] Communication patterns specified (ActionResult<T>, `router.refresh()` post-mutation)
 - [x] Process patterns documented (state machine boundary, CV immutability, entitlement)
 
 **Project Structure**
 - [x] Complete directory structure defined (all files and directories)
 - [x] Component boundaries established (8 domain boundaries with ownership rules)
-- [x] Integration points mapped (Cron, Stripe, Gmail, R2, Sentry)
+- [x] Integration points mapped (Cron, Stripe, Gmail, Vercel Blob, Sentry)
 - [x] Requirements to structure mapping complete (FR1–56 → files table)
 
 ### Architecture Readiness Assessment
@@ -659,12 +658,12 @@ Resolution: `entitlement-service.ts` always reads subscription tier from DB. JWT
 
 **Key Strengths:**
 - Vitality state machine boundary is explicit and enforced by pattern rules — highest-risk component well-controlled
-- CV snapshot immutability and direct R2 upload are clearly specified — second-highest risk resolved
+- CV snapshot immutability and direct Vercel Blob upload are clearly specified — second-highest risk resolved
 - Entitlement enforcement reads from DB — subscription tier stays accurate regardless of JWT staleness
 - pg-boss on Vercel solved cleanly with Vercel Cron — no additional infrastructure required for MVP
 
 **Areas for Future Enhancement:**
-- Upstash Redis for shared cache if next/cache proves insufficient under load
+- Upstash Redis or `unstable_cache` if `router.refresh()` proves insufficient under load
 - TanStack Query if real-time polling patterns emerge
 - Dedicated long-running worker if Vercel Cron 60s window becomes limiting
 - Prisma Accelerate for global edge caching of DB queries
