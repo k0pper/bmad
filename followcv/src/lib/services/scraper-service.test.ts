@@ -88,6 +88,67 @@ describe("scrapeJobListing", () => {
     expect(result.data?.companyDomain).toBeUndefined()
   })
 
+  it("leaves companyDomain undefined when JSON-LD's hiringOrganization.url itself points back at a job board", async () => {
+    // The original Stepstone fix only blocked the source-URL fallback. But
+    // many job boards inject themselves into `hiringOrganization.url` when
+    // the employer's own site is unknown — we have to deny-list them here
+    // too, otherwise Gmail signals would search `from:stepstone.de` and
+    // pick up job-alert emails as "employer replies".
+    const jobPosting = {
+      "@type": "JobPosting",
+      title: "Dev",
+      hiringOrganization: {
+        name: "Acme",
+        url: "https://www.stepstone.de/cmp/de/acme-12345",
+      },
+    }
+    const html = makeHtmlWithJsonLd(jobPosting)
+    vi.mocked(fetch).mockResolvedValue(new Response(html, { status: 200 }))
+
+    const result = await scrapeJobListing("https://www.stepstone.de/job/123", "user-1")
+
+    expect(result.data?.companyDomain).toBeUndefined()
+  })
+
+  it("denies LinkedIn and Indeed company URLs in hiringOrganization.url", async () => {
+    for (const url of [
+      "https://www.linkedin.com/company/acme",
+      "https://de.linkedin.com/company/acme",
+      "https://www.indeed.com/cmp/Acme",
+    ]) {
+      vi.mocked(fetch).mockResolvedValueOnce(
+        new Response(
+          makeHtmlWithJsonLd({
+            "@type": "JobPosting",
+            title: "Dev",
+            hiringOrganization: { name: "Acme", url },
+          }),
+          { status: 200 },
+        ),
+      )
+      const result = await scrapeJobListing("https://example.com/job", "user-1")
+      expect(result.data?.companyDomain, `denied for ${url}`).toBeUndefined()
+    }
+  })
+
+  it("lower-cases the extracted companyDomain (mixed-case JSON-LD URL)", async () => {
+    // Some JSON-LD has uppercased hostnames (rare but seen in the wild).
+    // Storing a mixed-case domain causes the Gmail processor's distinct-
+    // domain grouping to double-count, and breaks user-edited domains
+    // matching the scraper's output.
+    const jobPosting = {
+      "@type": "JobPosting",
+      title: "Dev",
+      hiringOrganization: { name: "Acme", url: "https://Careers.ACME.com/jobs/1" },
+    }
+    const html = makeHtmlWithJsonLd(jobPosting)
+    vi.mocked(fetch).mockResolvedValue(new Response(html, { status: 200 }))
+
+    const result = await scrapeJobListing("https://jobs.example.com/dev", "user-1")
+
+    expect(result.data?.companyDomain).toBe("careers.acme.com")
+  })
+
   it("handles array jobLocation", async () => {
     const jobPosting = {
       "@type": "JobPosting",

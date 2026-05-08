@@ -28,12 +28,17 @@ export const manualImportSchema = z.object({
 function normaliseDomain(input: string): string | undefined {
   const trimmed = input.trim()
   if (!trimmed) return undefined
-  // Accept either a full URL (https://acme.com/jobs) or a bare host (acme.com)
+  // Accept either a full URL (https://acme.com/jobs) or a bare host (acme.com).
+  // Always lower-case the result — Gmail's `from:` search syntax is
+  // case-insensitive but downstream code (vitality recompute, distinct-domain
+  // grouping) compares strings exactly. Mixed-case storage causes
+  // double-counting and missed matches.
   try {
     const u = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`)
-    return u.hostname.replace(/^www\./, "") || undefined
+    const host = u.hostname.replace(/^www\./, "").toLowerCase()
+    return host || undefined
   } catch {
-    return trimmed.replace(/^www\./, "")
+    return trimmed.replace(/^www\./, "").toLowerCase()
   }
 }
 

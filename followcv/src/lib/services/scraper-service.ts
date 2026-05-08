@@ -17,6 +17,53 @@ export type ScraperOutput =
   | { data: Partial<ScrapeResult>; partial: true; error: string }
   | { data: null; partial: false; error: string }
 
+// Known job-board hosts whose JSON-LD `hiringOrganization.url` often points
+// back at themselves (e.g. a Stepstone profile page) when the employer's
+// own URL is unknown. Treating those as the company domain would have the
+// Gmail signal processor search for messages from the job board instead of
+// the actual employer — exactly the bug `companyDomain=stepstone.de` causes.
+// Match suffix-wise so `xing.com` also catches `www.xing.com`, and
+// `linkedin.com` also catches `de.linkedin.com`.
+const JOB_BOARD_HOSTS = [
+  "stepstone.de",
+  "stepstone.com",
+  "linkedin.com",
+  "indeed.com",
+  "indeed.de",
+  "glassdoor.com",
+  "glassdoor.de",
+  "xing.com",
+  "monster.com",
+  "monster.de",
+  "ziprecruiter.com",
+  "lever.co",
+  "greenhouse.io",
+  "workable.com",
+  "smartrecruiters.com",
+  "jobs.de",
+  "jobware.de",
+  "kimeta.de",
+  "joblift.de",
+  "jobvector.de",
+  "honeypot.io",
+  "wellfound.com",
+  "angel.co",
+  "builtin.com",
+  "remote.co",
+  "weworkremotely.com",
+  "arbeitsagentur.de",
+  "stellenanzeigen.de",
+  "metajob.de",
+  "yourfirm.de",
+] as const
+
+function isJobBoardHost(host: string): boolean {
+  const lower = host.toLowerCase()
+  return JOB_BOARD_HOSTS.some(
+    (jb) => lower === jb || lower.endsWith(`.${jb}`),
+  )
+}
+
 function extractCompanyDomain(urlString: string): string | null {
   try {
     const { hostname } = new URL(urlString)
@@ -24,8 +71,10 @@ function extractCompanyDomain(urlString: string): string | null {
     // collapse to the last two labels (e.g. `careers.example.co.uk` → `co.uk`),
     // which is wrong for ccTLDs and inconsistent with what users actually
     // type into Gmail's search ("from:<host>").
-    const stripped = hostname.replace(/^www\./, "")
-    return stripped.length > 0 ? stripped : null
+    const stripped = hostname.replace(/^www\./, "").toLowerCase()
+    if (stripped.length === 0) return null
+    if (isJobBoardHost(stripped)) return null
+    return stripped
   } catch {
     return null
   }
@@ -40,8 +89,9 @@ function extractFromJobPosting(parsed: any): ScrapeResult {
 
   // Prefer the employer's own URL for the company domain — the source URL
   // host is wrong for any job-board listing (Stepstone, LinkedIn, Indeed,
-  // …). Only set if the JSON-LD includes a usable hiringOrganization.url;
-  // callers fall back to leaving the field null otherwise.
+  // …). Only set if the JSON-LD includes a usable hiringOrganization.url
+  // and that URL doesn't itself point back at a known job board. Callers
+  // fall back to leaving the field null otherwise.
   if (parsed.hiringOrganization?.url) {
     const domain = extractCompanyDomain(String(parsed.hiringOrganization.url))
     if (domain) result.companyDomain = domain
