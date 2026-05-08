@@ -1,6 +1,16 @@
-import { createBoss, ensureQueues, JOB_VITALITY_RECOMPUTE, JOB_HANDLERS } from "@/lib/jobs"
+import {
+  createBoss,
+  ensureQueues,
+  JOB_HANDLERS,
+  JOB_PROCESS_ORDER,
+} from "@/lib/jobs"
 
 export const maxDuration = 60
+
+type JobOutcome =
+  | { status: "no-pending-job" }
+  | { status: "completed"; jobId: string; result: unknown }
+  | { status: "failed"; jobId: string; error: string }
 
 export async function POST(request: Request): Promise<Response> {
   const authHeader = request.headers.get("authorization")
@@ -16,27 +26,33 @@ export async function POST(request: Request): Promise<Response> {
     await boss.start()
     await ensureQueues(boss)
 
-    // Send a new job (stately policy: no-op if one is already queued or active)
-    await boss.send(JOB_VITALITY_RECOMPUTE, {})
+    // Send each job once per tick (stately policy makes this a no-op if one
+    // is already queued or active). Then drain in order.
+    const results: Record<string, JobOutcome> = {}
+    let anyFailed = false
 
-    // Fetch any pending job (could be the one just sent or a retry from earlier)
-    const jobs = await boss.fetch(JOB_VITALITY_RECOMPUTE)
-
-    if (!jobs || jobs.length === 0) {
-      return Response.json({ message: "no pending jobs" })
+    for (const jobName of JOB_PROCESS_ORDER) {
+      await boss.send(jobName, {})
+      const jobs = await boss.fetch(jobName)
+      if (!jobs || jobs.length === 0) {
+        results[jobName] = { status: "no-pending-job" }
+        continue
+      }
+      const [job] = jobs
+      try {
+        const handler = JOB_HANDLERS[jobName]
+        const result = await handler()
+        await boss.complete(jobName, job.id, result as object)
+        results[jobName] = { status: "completed", jobId: job.id, result }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        await boss.fail(jobName, job.id, { error: message })
+        results[jobName] = { status: "failed", jobId: job.id, error: message }
+        anyFailed = true
+      }
     }
 
-    const [job] = jobs
-
-    try {
-      const result = await JOB_HANDLERS[JOB_VITALITY_RECOMPUTE]()
-      await boss.complete(JOB_VITALITY_RECOMPUTE, job.id, result as object)
-      return Response.json({ jobId: job.id, ...(result as object) })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      await boss.fail(JOB_VITALITY_RECOMPUTE, job.id, { error: message })
-      return Response.json({ error: message }, { status: 500 })
-    }
+    return Response.json({ results }, { status: anyFailed ? 500 : 200 })
   } finally {
     await boss.stop({ graceful: false })
   }

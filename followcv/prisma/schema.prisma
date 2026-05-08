@@ -208,14 +208,19 @@ model CvSnapshot {
 }
 
 model GmailToken {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  accessToken    String
-  refreshToken   String
-  expiresAt      DateTime
-  connectedEmail String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  accessToken         String
+  refreshToken        String
+  expiresAt           DateTime
+  connectedEmail      String
+  /// Watermark for the gmail-ingest-signals job (Story 6.2). NULL on first
+  /// run after the user connects — the processor falls back to `createdAt`
+  /// as the "after:" floor so we never look at email older than the connect
+  /// event. Updated to `now` after each successful per-user processing pass.
+  lastSignalCheckAt   DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
