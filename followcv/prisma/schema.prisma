@@ -82,6 +82,12 @@ model User {
   subscriptionTier SubscriptionTier @default(FREE)
   isActive         Boolean          @default(true)
   lastVisitAt      DateTime?
+  // Stripe customer + subscription tracking (Story 5.2)
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  /// When set, the Pro subscription has been cancelled but is still active
+  /// until this timestamp. After this date the webhook downgrades the tier.
+  subscriptionEndsAt    DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 

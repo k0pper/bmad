@@ -13,7 +13,32 @@ Each story spec under `_bmad-output/implementation-artifacts/3-N-*.md` is now `S
 
 ## External configuration you'll need to do
 
-_(none from Epic 3 stories — all use existing Vercel Blob + DB infra)_
+### 🔴 Stripe — required for Story 5.2 to actually work
+
+Story 5.2's code is shipped and tested but unusable until Stripe is configured. The `/settings/subscription` page renders without it (just won't fetch the Pro billing date); the **Upgrade to Pro** and **Cancel** buttons throw "STRIPE_SECRET_KEY is not set" until you do this.
+
+1. **Create a Stripe account** (or use the existing dev one) and switch to **Test mode** for now.
+2. **Create the Pro Product + Price** in Stripe → Products → Add product:
+   - Name: `FollowCV Pro` (or whatever)
+   - Price: recurring monthly (or yearly), e.g. €9/month
+   - Copy the resulting Price id (starts with `price_…`).
+3. **Add the env vars** to `.env.local` (and to Vercel project env for prod):
+   ```
+   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_PRO_PRICE_ID=price_...
+   STRIPE_WEBHOOK_SECRET=whsec_...   # filled in step 5
+   APP_URL=http://localhost:3000     # or your Vercel URL in prod
+   ```
+4. **Configure the webhook** in Stripe → Developers → Webhooks → Add endpoint:
+   - Endpoint URL: `https://YOUR_DOMAIN/api/webhooks/stripe` (in dev, use `stripe listen --forward-to localhost:3000/api/webhooks/stripe` and copy the URL it prints)
+   - Events to send: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+5. **Copy the webhook signing secret** from the endpoint detail page → into `STRIPE_WEBHOOK_SECRET`.
+6. **Restart the dev server** so the env vars are picked up.
+7. **Smoke test**: open `/settings/subscription`, click Upgrade, complete the test checkout (use card `4242 4242 4242 4242`, any future expiry, any CVC). The webhook should flip your user to PRO; the page should reflect it on refresh. Then click Cancel, confirm, and verify `subscriptionEndsAt` is set.
+
+For local development, `stripe listen` (Stripe CLI) is the cleanest way to get a working webhook without exposing your laptop. Install via `brew install stripe/stripe-cli/stripe` and run `stripe login` first.
+
+### Optional: AppConfig tunables
 
 If you want to override the follow-up-due threshold (default 7 days), insert/update the AppConfig row:
 
@@ -39,4 +64,15 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, "updatedAt" = now();
 - **Concurrent delete races on shared CvSnapshot blobs** — two unrelated open issues from Story 3.2's review remain in `_bmad-output/implementation-artifacts/deferred-work.md`. They need a future blob-reaper job; out of scope for these stories.
 - **Story 3.3 architecture document still references Cloudflare R2 + `revalidateTag`** in places — by deliberate decision, that doc is treated as historical context and not updated per-story. The binding doc is `followcv/project-context.md`.
 
-_(appended as I go through Epic 4 / Epic 5)_
+### Epic 4 + 5 stories shipped
+
+- **4.1 — Health Score Engine** ✅ (pure function with 5 indicators, 20 unit tests covering every threshold boundary, every priority pair, edge cases, purity)
+- **4.2 — Health Score Widget** ✅ (Server Component in the dashboard sidebar, under `<Suspense>` so it doesn't block layout)
+- **5.1 — Listing Cap Enforcement** ✅ (Pro short-circuit, ProGatePattern reusable component, 80%/90% banners)
+- **5.2 — Pro Subscription via Stripe** ✅ code-only — needs the configuration above to work end-to-end
+
+### Carried-over follow-ups
+
+- **Story 5.2 over-cap downgrade UX** — when a user cancels Pro and ends up over the listing cap, the spec says the board should render listings read-only with a prompt to archive. Not implemented in the autonomous run; the cap blocking on imports already works (`checkListingCap`), but the read-only board treatment is a focused follow-up. ~½ day.
+- **Architecture document still references Cloudflare R2 and `revalidateTag`** — by deliberate decision; not updated per-story.
+- **Two blob-orphan races from Story 3.2 review** — still in `_bmad-output/implementation-artifacts/deferred-work.md`, awaiting a future blob-reaper job.
