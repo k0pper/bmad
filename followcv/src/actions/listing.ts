@@ -246,6 +246,7 @@ export async function updateListing(
   const parsed = updateListingSchema.safeParse({
     title: formData.get("title"),
     company: formData.get("company"),
+    companyDomain: formData.get("companyDomain") ?? undefined,
     location: formData.get("location") ?? undefined,
     salaryMin: formData.get("salaryMin") ?? undefined,
     salaryMax: formData.get("salaryMax") ?? undefined,
@@ -267,6 +268,7 @@ export async function updateListing(
     data: {
       title: parsed.data.title,
       company: parsed.data.company,
+      companyDomain: parsed.data.companyDomain,
       location: parsed.data.location,
       salaryMin: parsed.data.salaryMin,
       salaryMax: parsed.data.salaryMax,

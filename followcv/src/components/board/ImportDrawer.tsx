@@ -43,6 +43,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
   // Manual form fields
   const [manualTitle, setManualTitle] = useState("")
   const [manualCompany, setManualCompany] = useState("")
+  const [manualCompanyDomain, setManualCompanyDomain] = useState("")
   const [manualLocation, setManualLocation] = useState("")
   const [manualSourceUrl, setManualSourceUrl] = useState("")
   const [manualNotes, setManualNotes] = useState("")
@@ -56,6 +57,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
     setErrorMessage(null)
     setManualTitle("")
     setManualCompany("")
+    setManualCompanyDomain("")
     setManualLocation("")
     setManualSourceUrl("")
     setManualNotes("")
@@ -140,6 +142,7 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
     const fd = new FormData()
     fd.append("title", manualTitle)
     fd.append("company", manualCompany)
+    if (manualCompanyDomain) fd.append("companyDomain", manualCompanyDomain)
     if (manualLocation) fd.append("location", manualLocation)
     if (manualSalaryMin) fd.append("salaryMin", manualSalaryMin)
     if (manualSalaryMax) fd.append("salaryMax", manualSalaryMax)
@@ -289,6 +292,22 @@ export function ImportDrawer({ open, onOpenChange }: ImportDrawerProps) {
                     placeholder="e.g. Acme Corp"
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+                    Company email domain
+                  </label>
+                  <input
+                    type="text"
+                    value={manualCompanyDomain}
+                    onChange={(e) => setManualCompanyDomain(e.target.value)}
+                    placeholder="e.g. acme.com"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
+                  <p className="text-xs" style={{ color: "var(--color-text-tertiary)" }}>
+                    Optional. Used by Gmail auto-tracking to match employer replies. You can fix this later from the listing detail page.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">

@@ -199,6 +199,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
           initialValues={{
             title: listing.title,
             company: listing.company,
+            companyDomain: listing.companyDomain,
             location: listing.location,
             salaryMin: listing.salaryMin,
             salaryMax: listing.salaryMax,

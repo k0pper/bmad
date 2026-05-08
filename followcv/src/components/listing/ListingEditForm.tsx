@@ -9,6 +9,7 @@ import { Toast } from "@/components/ui/Toast"
 type InitialValues = {
   title: string
   company: string
+  companyDomain: string | null
   location: string | null
   salaryMin: number | null
   salaryMax: number | null
@@ -54,6 +55,12 @@ export function ListingEditForm({ listingId, initialValues }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <Field label="Title" name="title" defaultValue={initialValues.title} required />
         <Field label="Company" name="company" defaultValue={initialValues.company} required />
+        <Field
+          label="Company email domain"
+          name="companyDomain"
+          defaultValue={initialValues.companyDomain ?? ""}
+          help="e.g. acme.com — used by Gmail auto-tracking to match employer replies."
+        />
         <Field label="Location" name="location" defaultValue={initialValues.location ?? ""} />
         <Field
           label="Currency"
@@ -107,6 +114,7 @@ function Field({
   defaultValue,
   required = false,
   maxLength,
+  help,
 }: {
   label: string
   name: string
@@ -114,6 +122,7 @@ function Field({
   defaultValue?: string
   required?: boolean
   maxLength?: number
+  help?: string
 }) {
   return (
     <label className="block">
@@ -132,6 +141,14 @@ function Field({
         className="w-full rounded-md border px-3 py-2 text-sm"
         style={{ borderColor: "var(--color-border, #e2e8f0)" }}
       />
+      {help && (
+        <span
+          className="mt-1 block text-xs"
+          style={{ color: "var(--color-text-tertiary)" }}
+        >
+          {help}
+        </span>
+      )}
     </label>
   )
 }

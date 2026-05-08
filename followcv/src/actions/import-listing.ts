@@ -188,6 +188,7 @@ export async function manualImportListing(formData: FormData): Promise<ActionRes
   const parsed = manualImportSchema.safeParse({
     title: formData.get("title"),
     company: formData.get("company"),
+    companyDomain: formData.get("companyDomain") || undefined,
     location: formData.get("location") || undefined,
     salaryMin: formData.get("salaryMin") || undefined,
     salaryMax: formData.get("salaryMax") || undefined,
@@ -215,6 +216,7 @@ export async function manualImportListing(formData: FormData): Promise<ActionRes
       userId,
       title: parsed.data.title,
       company: parsed.data.company,
+      companyDomain: parsed.data.companyDomain ?? null,
       location: parsed.data.location ?? null,
       salaryMin: parsed.data.salaryMin ? Number(parsed.data.salaryMin) : null,
       salaryMax: parsed.data.salaryMax ? Number(parsed.data.salaryMax) : null,
