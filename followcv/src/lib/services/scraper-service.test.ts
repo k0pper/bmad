@@ -31,7 +31,7 @@ describe("scrapeJobListing", () => {
     const jobPosting = {
       "@type": "JobPosting",
       title: "Senior Engineer",
-      hiringOrganization: { name: "Acme Corp" },
+      hiringOrganization: { name: "Acme Corp", url: "https://www.acme.com/" },
       jobLocation: { address: { addressLocality: "San Francisco" } },
       baseSalary: { currency: "USD", value: { minValue: 120000, maxValue: 180000 } },
       datePosted: "2025-06-01",
@@ -49,19 +49,43 @@ describe("scrapeJobListing", () => {
     expect(result.data?.salaryMin).toBe(120000)
     expect(result.data?.salaryMax).toBe(180000)
     expect(result.data?.salaryCurrency).toBe("USD")
-    expect(result.data?.companyDomain).toBe("example.com")
+    // companyDomain is sourced from hiringOrganization.url (employer's own
+    // URL), not from the source URL host (which is typically a job board).
+    expect(result.data?.companyDomain).toBe("acme.com")
     expect(result.data?.postedAt).toBeInstanceOf(Date)
     expect(result.data?.closingDate).toBeInstanceOf(Date)
   })
 
-  it("extracts domain from URL hostname", async () => {
-    const jobPosting = { "@type": "JobPosting", title: "Dev" }
+  it("falls back to hiringOrganization.sameAs when .url is missing", async () => {
+    const jobPosting = {
+      "@type": "JobPosting",
+      title: "Dev",
+      hiringOrganization: { name: "Acme", sameAs: "https://acme.example.org/about" },
+    }
     const html = makeHtmlWithJsonLd(jobPosting)
     vi.mocked(fetch).mockResolvedValue(new Response(html, { status: 200 }))
 
-    const result = await scrapeJobListing("https://careers.bigcorp.co.uk/jobs/123", "user-1")
+    const result = await scrapeJobListing("https://jobs.example.com/dev", "user-1")
 
-    expect(result.data?.companyDomain).toBe("co.uk")
+    expect(result.data?.companyDomain).toBe("acme.example.org")
+  })
+
+  it("leaves companyDomain undefined when JSON-LD has no employer URL — does NOT fall back to source URL host", async () => {
+    // This is the Stepstone-style case: source URL is the job board, not
+    // the employer. Filling companyDomain from the source host would mean
+    // Story 6.2's processor searches Gmail for emails from the job board
+    // instead of the actual company.
+    const jobPosting = {
+      "@type": "JobPosting",
+      title: "Dev",
+      hiringOrganization: { name: "Acme" },
+    }
+    const html = makeHtmlWithJsonLd(jobPosting)
+    vi.mocked(fetch).mockResolvedValue(new Response(html, { status: 200 }))
+
+    const result = await scrapeJobListing("https://www.stepstone.de/job/123", "user-1")
+
+    expect(result.data?.companyDomain).toBeUndefined()
   })
 
   it("handles array jobLocation", async () => {

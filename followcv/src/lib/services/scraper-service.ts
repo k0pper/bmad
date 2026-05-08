@@ -20,8 +20,12 @@ export type ScraperOutput =
 function extractCompanyDomain(urlString: string): string | null {
   try {
     const { hostname } = new URL(urlString)
-    const parts = hostname.split(".")
-    return parts.length >= 2 ? parts.slice(-2).join(".") : hostname
+    // Strip leading "www." but otherwise preserve the full host. We used to
+    // collapse to the last two labels (e.g. `careers.example.co.uk` → `co.uk`),
+    // which is wrong for ccTLDs and inconsistent with what users actually
+    // type into Gmail's search ("from:<host>").
+    const stripped = hostname.replace(/^www\./, "")
+    return stripped.length > 0 ? stripped : null
   } catch {
     return null
   }
@@ -33,6 +37,18 @@ function extractFromJobPosting(parsed: any): ScrapeResult {
 
   if (parsed.title) result.title = String(parsed.title)
   if (parsed.hiringOrganization?.name) result.company = String(parsed.hiringOrganization.name)
+
+  // Prefer the employer's own URL for the company domain — the source URL
+  // host is wrong for any job-board listing (Stepstone, LinkedIn, Indeed,
+  // …). Only set if the JSON-LD includes a usable hiringOrganization.url;
+  // callers fall back to leaving the field null otherwise.
+  if (parsed.hiringOrganization?.url) {
+    const domain = extractCompanyDomain(String(parsed.hiringOrganization.url))
+    if (domain) result.companyDomain = domain
+  } else if (parsed.hiringOrganization?.sameAs) {
+    const domain = extractCompanyDomain(String(parsed.hiringOrganization.sameAs))
+    if (domain) result.companyDomain = domain
+  }
 
   const jobLocation = Array.isArray(parsed.jobLocation)
     ? parsed.jobLocation[0]
@@ -133,7 +149,10 @@ export async function scrapeJobListing(url: string, userId: string): Promise<Scr
     }
 
     const extracted = extractFromJobPosting(jobPosting)
-    extracted.companyDomain = extractCompanyDomain(url) ?? undefined
+    // Do NOT fall back to the source URL host — it points at the job board
+    // (stepstone.de, linkedin.com, indeed.com, …) which is never the
+    // employer's email domain. If JSON-LD didn't supply hiringOrganization.url,
+    // leave companyDomain null and let the user fill it in via the edit form.
 
     const fieldsExtracted = ALL_FIELDS.filter((f) => extracted[f] != null)
     const allFilled = ALL_FIELDS.every((f) => extracted[f] != null)
