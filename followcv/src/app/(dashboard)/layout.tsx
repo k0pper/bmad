@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { UserMenu } from '@/components/shared/UserMenu'
 import { SidebarShell } from '@/components/shared/SidebarShell'
 import { Logo } from '@/components/shared/Logo'
 import { NavLink } from '@/components/shared/NavLink'
+import { HealthScoreWidget } from '@/components/health/HealthScoreWidget'
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -20,8 +22,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </Link>
         </div>
 
-        {/* Health score slot — wired up in Story 4.1; invisible until then */}
-        <div data-testid="health-score-slot" />
+        {/* Health score widget — Server Component; queries Prisma at render time. */}
+        <Suspense fallback={<div data-testid="health-score-slot" />}>
+          <HealthScoreWidget />
+        </Suspense>
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-2 space-y-0.5" aria-label="Main navigation">
